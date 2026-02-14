@@ -1,4 +1,5 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const { app, BrowserWindow, dialog, ipcMain, safeStorage } = require('electron');
 
 const { ProfileStore } = require('./lib/profile-store');
@@ -10,6 +11,30 @@ let profileStore;
 let languageStore;
 let updaterClient;
 let activeInstall = null;
+
+function resolveLanguageDirectory(langDirFromEnv) {
+  if (langDirFromEnv) {
+    return path.resolve(langDirFromEnv);
+  }
+
+  const packagedResourcesDir = path.join(process.resourcesPath, 'languages');
+  const bundledAppDir = path.join(app.getAppPath(), 'languages');
+  const fallbackUserDir = path.join(app.getPath('userData'), 'languages');
+
+  if (app.isPackaged) {
+    if (fs.existsSync(packagedResourcesDir)) {
+      return packagedResourcesDir;
+    }
+
+    if (fs.existsSync(bundledAppDir)) {
+      return bundledAppDir;
+    }
+
+    return fallbackUserDir;
+  }
+
+  return bundledAppDir;
+}
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -252,9 +277,7 @@ function registerIpcHandlers() {
 app.whenReady().then(() => {
   const dataDir = app.getPath('userData');
   const langDirFromEnv = process.env.AEROSYNC_LANG_DIR;
-  const languageDir = langDirFromEnv
-    ? path.resolve(langDirFromEnv)
-    : path.join(process.cwd(), 'languages');
+  const languageDir = resolveLanguageDirectory(langDirFromEnv);
   const hasSafeStorage = safeStorage.isEncryptionAvailable();
   if (!hasSafeStorage) {
     console.warn('safeStorage encryption unavailable: credentials will be stored as plain text.');
