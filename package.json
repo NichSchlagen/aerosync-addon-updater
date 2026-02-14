@@ -1,0 +1,36 @@
+{
+  "name": "aerosync-addon-updater",
+  "version": "1.0.0",
+  "description": "Desktop updater for X-Plane aircraft using the X-Updater service with multi-profile management",
+  "main": "main.js",
+  "private": true,
+  "author": "Tim Rosenhagen",
+  "scripts": {
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "pack": "electron-builder --dir",
+    "build:appimage": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.aerosync.addonupdater",
+    "productName": "AeroSync Addon Updater",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "src/**/*",
+      "languages/**/*",
+      "package.json"
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    },
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  }
+}
