@@ -73,7 +73,8 @@ npm run build:appimage
 ## Language System
 
 - English is the default application language.
-- Languages are loaded from `languages/` in the current working directory.
+- In packaged builds (AppImage/Windows), languages are loaded from bundled app resources automatically.
+- In development, languages are loaded from the local `languages/` folder.
 - You can override the language directory with:
 
 ```bash
