@@ -27,13 +27,15 @@
       "lib/**/*",
       "src/**/*",
       "languages/**/*",
-      "package.json"
+      "package.json",
+      "build/icons/**/*"
     ],
     "linux": {
       "target": [
         "AppImage"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "build/icons/icon.png"
     },
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "extraResources": [
@@ -43,13 +45,21 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "build/icons",
+        "to": "build/icons",
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "build/icons/icon.ico"
     }
   }
 }
