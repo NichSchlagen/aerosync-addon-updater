@@ -34,10 +34,11 @@ If you want to use the official Java client instead:
 
 ## Requirements
 
-- Linux desktop environment with GUI
-- Node.js + npm
+- Node.js 20+
+- npm 10+
+- Linux desktop environment with GUI (for local Linux run/build)
 
-## Run
+## Development Run
 
 1. Install dependencies:
 
@@ -51,24 +52,51 @@ npm install
 npm start
 ```
 
-## Build AppImage (Linux)
-
-1. Install dependencies (including build tools):
+On Linux, if needed, use:
 
 ```bash
-npm install
+npm run start:linux
 ```
 
-2. Build the AppImage:
+## Local Build Process
+
+All build output is written to `dist/`.
+
+### Linux AppImage
 
 ```bash
 npm run build:appimage
 ```
 
-3. Output location:
+Expected artifact pattern:
 
-- The AppImage will be created in `dist/`.
-- Example: `dist/AeroSync Addon Updater-0.1.0-x64.AppImage`
+- `dist/AeroSync Addon Updater-<version>-x86_64.AppImage`
+
+### Windows Setup EXE (NSIS)
+
+```bash
+npm run build:win:setup
+```
+
+Expected artifact pattern:
+
+- `dist/AeroSync Addon Updater-<version>-x64-setup.exe`
+
+### Windows Portable EXE
+
+```bash
+npm run build:win:portable
+```
+
+Expected artifact pattern:
+
+- `dist/AeroSync Addon Updater-<version>-x64-portable.exe`
+
+### Build Both Windows Variants
+
+```bash
+npm run build:win
+```
 
 ## Language System
 
