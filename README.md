@@ -3,6 +3,17 @@
 Desktop updater for X-Plane aircraft add-ons that use the X-Updater service.
 This app is designed for managing multiple aircraft profiles in one place.
 
+## Documentation
+
+Full documentation is available in [`docs/`](./docs/README.md):
+
+- Getting Started
+- User Guide
+- Update Engine internals
+- Data, storage, and security
+- CI/CD release flow
+- Troubleshooting
+
 ## What This App Does
 
 - Manage multiple profiles (different aircraft folders, channels, and credentials)
@@ -70,7 +81,7 @@ npm run build:appimage
 
 Expected artifact pattern:
 
-- `dist/AeroSync Addon Updater-<version>-x86_64.AppImage`
+- `dist/AeroSync.Addon.Updater-<version>-x86_64.AppImage`
 
 ### Windows Setup EXE (NSIS)
 
@@ -80,7 +91,7 @@ npm run build:win:setup
 
 Expected artifact pattern:
 
-- `dist/AeroSync Addon Updater-<version>-x64-setup.exe`
+- `dist/AeroSync.Addon.Updater-<version>-x64-setup.exe`
 
 ### Windows Portable EXE
 
@@ -90,7 +101,7 @@ npm run build:win:portable
 
 Expected artifact pattern:
 
-- `dist/AeroSync Addon Updater-<version>-x64-portable.exe`
+- `dist/AeroSync.Addon.Updater-<version>-x64-portable.exe`
 
 ### Build Both Windows Variants
 
