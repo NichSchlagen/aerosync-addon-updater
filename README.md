@@ -98,6 +98,13 @@ Expected artifact pattern:
 npm run build:win
 ```
 
+Windows setup and portable builds are currently not tested by the maintainer.
+If you run into problems, please open a GitHub issue with:
+
+- the error description/message
+- the steps that trigger the issue
+
+
 ## Language System
 
 - English is the default application language.
