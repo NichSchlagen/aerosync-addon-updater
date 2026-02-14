@@ -131,6 +131,10 @@
     "alert.startupFailed": "Startfehler:\n{message}",
     "alert.i18nLoadFailed": "Sprachdatei konnte nicht geladen werden:\n{message}",
     "confirm.deleteProfile": "Profil wirklich löschen?\n{name}",
-    "confirm.cancelInstall": "Laufende Installation wirklich abbrechen?"
+    "confirm.cancelInstall": "Laufende Installation wirklich abbrechen?",
+    "field.ignoreList": "Ignore-Liste",
+    "placeholder.ignoreList": "ein Pfad pro Zeile, z. B.\nliveries/\nobjects/custom.obj",
+    "tooltip.ignoreList": "Ein Pfadmuster pro Zeile. Zeilen mit # werden ignoriert.",
+    "log.ignoreApplied": "Ignore-Liste angewendet: {count} Aktion(en) übersprungen."
   }
 }

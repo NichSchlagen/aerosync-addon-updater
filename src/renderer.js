@@ -28,6 +28,7 @@ const el = {
   productDir: document.getElementById('productDir'),
   login: document.getElementById('login'),
   licenseKey: document.getElementById('licenseKey'),
+  ignoreList: document.getElementById('ignoreList'),
   packageVersion: document.getElementById('packageVersion'),
   rememberAuth: document.getElementById('rememberAuth'),
   channel: document.getElementById('channel'),
@@ -103,6 +104,21 @@ function formatDownload(summary) {
   }
 
   return formatBytes(estimatedMax);
+}
+
+function parseIgnoreListInput(input) {
+  return String(input || '')
+    .split(/\r?\n/g)
+    .map((line) => line.trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/{2,}/g, '/'))
+    .filter((line, index, all) => line && !line.startsWith('#') && all.indexOf(line) === index);
+}
+
+function formatIgnoreListOutput(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return '';
+  }
+
+  return entries.join('\n');
 }
 
 function escapeHtml(input) {
@@ -318,6 +334,7 @@ function collectProfileFromForm() {
     productDir: el.productDir.value.trim(),
     login: el.login.value.trim(),
     licenseKey: el.licenseKey.value.trim(),
+    ignoreList: parseIgnoreListInput(el.ignoreList.value),
     packageVersion: Number(el.packageVersion.value || '0'),
     rememberAuth: el.rememberAuth.checked,
     channel: String(el.channel.value || 'release')
@@ -330,6 +347,7 @@ function fillForm(profile) {
   el.productDir.value = profile?.productDir || '';
   el.login.value = profile?.login || '';
   el.licenseKey.value = profile?.licenseKey || '';
+  el.ignoreList.value = formatIgnoreListOutput(profile?.ignoreList || []);
   el.packageVersion.value = Number(profile?.packageVersion || 0);
   el.rememberAuth.checked = Boolean(profile?.rememberAuth ?? true);
   el.channel.value = String(profile?.channel || 'release');
@@ -495,6 +513,7 @@ async function ensureProfileSaved() {
     'name',
     'host',
     'productDir',
+    'ignoreList',
     'packageVersion',
     'rememberAuth',
     'channel'
@@ -585,6 +604,11 @@ async function onCheckUpdates() {
       fileCount: planResult.summary.fileCount,
       download: downloadText
     }));
+    if (Number(planResult.summary.ignoredCount || 0) > 0) {
+      log(t('log.ignoreApplied', {
+        count: planResult.summary.ignoredCount
+      }));
+    }
     if (Number(planResult.summary.downloadSizeUnknownCount || 0) > 0) {
       log(t('log.hintPrefix', {
         message: t('log.downloadUnknownHint', {

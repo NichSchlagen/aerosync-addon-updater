@@ -13,6 +13,7 @@ Fields:
 - `License Key`: license key for the product
 - `Release Channel`: `release`, `beta`, or `alpha`
 - `Snapshot number (since)`: baseline snapshot for incremental checks
+- `Ignore list`: paths or patterns to skip during plan/install (one per line)
 - `Fresh Install`: force full reconciliation against current snapshot
 - `Store credentials in profile`: save credentials for reuse
 
@@ -65,3 +66,16 @@ Fresh install:
 - Rebuilds full target state
 - Adds delete actions for local files not present on server list
 - Useful for cleaning inconsistent product folders
+
+## Ignore List
+
+Use one entry per line in the profile field.
+
+Supported entries:
+
+- exact relative path (for example `objects/test.obj`)
+- folder prefix with trailing slash (for example `liveries/`)
+- simple wildcard patterns (for example `objects/**/*.dds`)
+- lines starting with `#` are comments
+
+Ignored files are removed from the action plan and counted in check summary/log output.

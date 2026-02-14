@@ -341,7 +341,8 @@ h3 {
 }
 
 input,
-select {
+select,
+textarea {
   border: 1px solid var(--border-color-light);
   border-radius: var(--radius-md);
   padding: 10px 11px;
@@ -351,7 +352,8 @@ select {
   transition: border-color 130ms ease, box-shadow 130ms ease;
 }
 
-input::placeholder {
+input::placeholder,
+textarea::placeholder {
   color: #8da0b5;
 }
 
@@ -364,8 +366,16 @@ select {
   padding-right: 34px;
 }
 
+textarea {
+  resize: vertical;
+  min-height: 92px;
+  font-family: var(--mono-font);
+  line-height: 1.35;
+}
+
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25);
 }

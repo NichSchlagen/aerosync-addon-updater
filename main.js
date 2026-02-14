@@ -98,7 +98,7 @@ function registerIpcHandlers() {
 
     if (profile.credentialsUnavailable && (!requestLogin || !requestLicenseKey)) {
       throw new Error(
-        'Gespeicherte Zugangsdaten konnten nicht entschluesselt werden. Bitte Login und License Key im Profil neu eintragen und speichern.'
+        'Stored credentials could not be decrypted. Please re-enter login and license key in the profile and save again.'
       );
     }
 
@@ -107,7 +107,7 @@ function registerIpcHandlers() {
 
     if (!login || !licenseKey) {
       throw new Error(
-        'Login und License Key fehlen. Bitte im Formular eintragen oder "Zugangsdaten speichern" aktivieren.'
+        'Login and license key are missing. Enter them in the form or enable "Store credentials in profile".'
       );
     }
 
@@ -121,7 +121,7 @@ function registerIpcHandlers() {
   const mapUpdaterError = (error) => {
     if (error instanceof UpdateHttpError && error.status === 401) {
       return new Error(
-        'Authentifizierung fehlgeschlagen (HTTP 401). Bitte Login/License Key prüfen und Profil erneut speichern.'
+        'Authentication failed (HTTP 401). Please verify login/license key and save the profile again.'
       );
     }
     return error;
@@ -198,7 +198,7 @@ function registerIpcHandlers() {
     const planId = assertNonEmptyString('planId', payload.planId);
 
     if (activeInstall) {
-      throw new Error('Es läuft bereits eine Installation.');
+      throw new Error('An installation is already running.');
     }
 
     const profile = profileStore.getProfile(profileId);
@@ -258,7 +258,7 @@ function registerIpcHandlers() {
   ipcMain.handle('updates:pause', async (event) => {
     const job = getActiveInstallForSender(event.sender);
     if (!job) {
-      throw new Error('Keine laufende Installation gefunden.');
+      throw new Error('No running installation found.');
     }
 
     job.paused = true;
@@ -268,7 +268,7 @@ function registerIpcHandlers() {
   ipcMain.handle('updates:resume', async (event) => {
     const job = getActiveInstallForSender(event.sender);
     if (!job) {
-      throw new Error('Keine laufende Installation gefunden.');
+      throw new Error('No running installation found.');
     }
 
     job.paused = false;
@@ -278,7 +278,7 @@ function registerIpcHandlers() {
   ipcMain.handle('updates:cancel', async (event) => {
     const job = getActiveInstallForSender(event.sender);
     if (!job) {
-      throw new Error('Keine laufende Installation gefunden.');
+      throw new Error('No running installation found.');
     }
 
     job.cancelRequested = true;
