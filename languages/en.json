@@ -131,6 +131,10 @@
     "alert.startupFailed": "Startup error:\n{message}",
     "alert.i18nLoadFailed": "Failed to load language file:\n{message}",
     "confirm.deleteProfile": "Delete profile?\n{name}",
-    "confirm.cancelInstall": "Cancel running installation?"
+    "confirm.cancelInstall": "Cancel running installation?",
+    "field.ignoreList": "Ignore list",
+    "placeholder.ignoreList": "one path per line, e.g.\nliveries/\nobjects/custom.obj",
+    "tooltip.ignoreList": "One path pattern per line. Lines starting with # are ignored.",
+    "log.ignoreApplied": "Ignore list applied: {count} action(s) skipped."
   }
 }
