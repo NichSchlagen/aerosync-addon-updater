@@ -36,6 +36,21 @@ function resolveLanguageDirectory(langDirFromEnv) {
   return bundledAppDir;
 }
 
+function resolveWindowIconPath() {
+  const candidates = [
+    path.join(process.resourcesPath, 'build', 'icons', 'icon.png'),
+    path.join(__dirname, 'build', 'icons', 'icon.png')
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return undefined;
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1320,
@@ -43,6 +58,7 @@ function createMainWindow() {
     minWidth: 1080,
     minHeight: 700,
     backgroundColor: '#f2efe7',
+    icon: resolveWindowIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
