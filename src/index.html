@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AeroSync Addon Updater</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a" aria-hidden="true"></div>
+    <div class="bg-shape bg-shape-b" aria-hidden="true"></div>
+
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-mark">AS</div>
+          <div class="brand-text">
+            <div class="brand-title" data-i18n="brand.title">AEROSYNC</div>
+            <div class="brand-subtitle" data-i18n="brand.subtitle">ADDON UPDATER</div>
+          </div>
+        </div>
+        <div class="sidebar-head">
+          <h1 data-i18n="sidebar.profiles">Profile</h1>
+          <button id="btnNewProfile" class="btn btn-ghost" data-i18n="btn.newProfile">New</button>
+        </div>
+        <ul id="profileList" class="profile-list"></ul>
+      </aside>
+
+      <section class="content">
+        <div class="content-scroll">
+          <header class="content-head">
+            <div>
+              <h2 id="selectedProfileName">No Profile</h2>
+            </div>
+            <div class="head-actions">
+              <label class="language-picker">
+                <span data-i18n="label.language">Language</span>
+                <select id="languageSelect" data-i18n-aria-label="label.language"></select>
+              </label>
+              <button id="btnSaveProfile" class="btn btn-primary" data-i18n="btn.saveProfile">Save Profile</button>
+              <button id="btnDeleteProfile" class="btn btn-danger" data-i18n="btn.deleteProfile">Delete Profile</button>
+            </div>
+          </header>
+
+          <section class="workspace-grid">
+            <article class="panel">
+              <h3 class="panel-title" data-i18n="panel.profileConfig">Profile Configuration</h3>
+              <div class="form-grid">
+                <label>
+                  <span data-i18n="field.profileName">Profile Name</span>
+                  <input id="profileName" type="text" placeholder="A320 Ultimate" data-i18n-placeholder="placeholder.profileName" />
+                </label>
+
+                <label>
+                  <span data-i18n="field.updateHost">Update Host</span>
+                  <input id="host" type="text" placeholder="https://update.x-plane.org" data-i18n-placeholder="placeholder.host" />
+                </label>
+
+                <label class="full-row">
+                  <span data-i18n="field.productDir">Product Directory</span>
+                  <div class="inline-path">
+                    <input id="productDir" type="text" placeholder="/home/user/X-Plane/Aircraft" data-i18n-placeholder="placeholder.productDir" />
+                    <button id="btnPickDir" class="btn btn-ghost" type="button" data-i18n="btn.browse">Browse</button>
+                  </div>
+                </label>
+
+                <label>
+                  <span data-i18n="field.login">Login / Email</span>
+                  <input id="login" type="text" placeholder="your-login" data-i18n-placeholder="placeholder.login" />
+                </label>
+
+                <label>
+                  <span data-i18n="field.licenseKey">License Key</span>
+                  <input id="licenseKey" type="password" placeholder="xxxx-xxxx-xxxx" data-i18n-placeholder="placeholder.licenseKey" />
+                </label>
+              </div>
+            </article>
+
+            <article class="panel">
+              <h3 class="panel-title" data-i18n="panel.updateConfig">Update Configuration</h3>
+              <div class="settings-grid">
+                <label>
+                  <span data-i18n="field.channel">Release Channel</span>
+                  <select id="channel">
+                    <option value="release" selected data-i18n="channel.release">Release (stable)</option>
+                    <option value="beta" data-i18n="channel.beta">Beta</option>
+                    <option value="alpha" data-i18n="channel.alpha">Alpha</option>
+                  </select>
+                </label>
+
+                <label>
+                  <span data-i18n="field.since">Snapshot Number (since)</span>
+                  <input id="packageVersion" type="number" min="0" step="1" value="0" />
+                </label>
+              </div>
+
+              <div class="options-row">
+                <label><input id="optFresh" type="checkbox" /> <span data-i18n="option.freshInstall">Fresh Install</span></label>
+                <label><input id="rememberAuth" type="checkbox" checked /> <span data-i18n="option.rememberAuth">Store credentials in profile</span></label>
+              </div>
+
+              <div class="run-row">
+                <button id="btnCheck" class="btn btn-primary" data-i18n="btn.checkUpdates">Check Updates</button>
+                <button id="btnInstall" class="btn btn-accent" disabled data-i18n="btn.install">Install</button>
+                <button id="btnPause" class="btn btn-ghost" disabled data-i18n="btn.pause">Pause</button>
+                <button id="btnCancel" class="btn btn-danger" disabled data-i18n="btn.cancel">Cancel</button>
+                <span id="runStatus" class="status" data-i18n="status.ready">Ready</span>
+              </div>
+            </article>
+          </section>
+
+          <section class="panel progress-panel progress-panel-wide" aria-live="polite">
+            <div class="progress-head">
+              <strong id="progressLabel" data-i18n="progress.ready">Ready</strong>
+              <span id="progressPercent" class="chip">0%</span>
+            </div>
+            <div class="progress-track">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <div class="progress-meta" id="progressMeta">0 / 0</div>
+            <div class="progress-file" id="progressFile">-</div>
+          </section>
+
+          <section class="summary-grid">
+            <article class="summary-card">
+              <h3 data-i18n="summary.snapshot">Snapshot</h3>
+              <p id="sumSnapshot">-</p>
+            </article>
+            <article class="summary-card">
+              <h3 data-i18n="summary.files">Files</h3>
+              <p id="sumFiles">-</p>
+            </article>
+            <article class="summary-card">
+              <h3 data-i18n="summary.download">Download (network)</h3>
+              <p id="sumDownload">-</p>
+            </article>
+            <article class="summary-card">
+              <h3 data-i18n="summary.disk">Disk (unpacked)</h3>
+              <p id="sumDisk">-</p>
+            </article>
+            <article class="summary-card">
+              <h3 data-i18n="summary.warnings">Warnings</h3>
+              <p id="sumWarnings">-</p>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3 class="panel-title" data-i18n="panel.filePlan">Planned File Plan</h3>
+              <span id="actionCount" class="chip">0 entries</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th class="col-action" data-i18n="table.action">Action</th>
+                    <th class="col-package" data-i18n="table.package">Package</th>
+                    <th class="col-file" data-i18n="table.file">File</th>
+                    <th class="col-size" data-i18n="table.size">Size</th>
+                  </tr>
+                </thead>
+                <tbody id="actionsTableBody">
+                  <tr>
+                    <td colspan="4" class="empty" data-i18n="table.noPlanYet">No update plan created yet.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h3 class="panel-title" data-i18n="panel.log">Log</h3>
+              <button id="btnClearLog" class="btn btn-ghost" data-i18n="btn.clearLog">Clear Log</button>
+            </div>
+            <pre id="logBox" class="log-box"></pre>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
