@@ -51,6 +51,7 @@ const el = {
   channel: document.getElementById('channel'),
 
   optFresh: document.getElementById('optFresh'),
+  optRepair: document.getElementById('optRepair'),
 
   btnNewProfile: document.getElementById('btnNewProfile'),
   btnDeleteProfile: document.getElementById('btnDeleteProfile'),
@@ -369,8 +370,31 @@ function syncActionButtons() {
 
 function syncFreshModeUi() {
   const isFresh = Boolean(el.optFresh.checked);
-  el.packageVersion.disabled = isFresh;
-  el.packageVersion.title = isFresh ? t('tooltip.freshSince') : '';
+  const isRepair = Boolean(el.optRepair.checked);
+  const ignoreSince = isFresh || isRepair;
+
+  el.packageVersion.disabled = ignoreSince;
+  el.packageVersion.title = isFresh
+    ? t('tooltip.freshSince')
+    : isRepair
+      ? t('tooltip.repairSince')
+      : '';
+}
+
+function onToggleFreshMode() {
+  if (el.optFresh.checked) {
+    el.optRepair.checked = false;
+  }
+
+  syncFreshModeUi();
+}
+
+function onToggleRepairMode() {
+  if (el.optRepair.checked) {
+    el.optFresh.checked = false;
+  }
+
+  syncFreshModeUi();
 }
 
 function getSelectedProfile() {
@@ -617,8 +641,13 @@ async function onCheckUpdates() {
     const options = {
       beta: channel === 'beta',
       alpha: channel === 'alpha',
-      fresh: el.optFresh.checked
+      fresh: el.optFresh.checked,
+      repair: el.optRepair.checked
     };
+
+    if (options.repair) {
+      log(t('log.repairModeEnabled'));
+    }
 
     const planResult = await window.aeroApi.checkUpdates({
       profileId: profile.id,
@@ -1013,7 +1042,8 @@ function wireEvents() {
   el.btnCancel.addEventListener('click', () => {
     void onCancelInstall();
   });
-  el.optFresh.addEventListener('change', syncFreshModeUi);
+  el.optFresh.addEventListener('change', onToggleFreshMode);
+  el.optRepair.addEventListener('change', onToggleRepairMode);
   el.btnClearLog.addEventListener('click', onClearLog);
 
   window.aeroApi.onMenuAction((action) => {
