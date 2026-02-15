@@ -1,6 +1,21 @@
 const DEFAULT_HOST = 'https://update.x-plane.org';
 const LANGUAGE_STORAGE_KEY = 'aerosync.language';
 
+const MENU_ACTIONS = Object.freeze({
+  PROFILE_NEW: 'profile:new',
+  PROFILE_SAVE: 'profile:save',
+  PROFILE_DELETE: 'profile:delete',
+  PROFILE_OPEN_DIR: 'profile:open-dir',
+  UPDATES_CHECK: 'updates:check',
+  UPDATES_INSTALL: 'updates:install',
+  UPDATES_PAUSE_RESUME: 'updates:pause-resume',
+  UPDATES_CANCEL: 'updates:cancel',
+  APP_CHECK_UPDATE: 'app:check-update',
+  LOG_CLEAR: 'log:clear'
+});
+
+let lastMenuStateSnapshot = '';
+
 const state = {
   profiles: [],
   selectedProfileId: null,
@@ -312,6 +327,27 @@ function updateProgressUi(progress) {
   el.progressFile.textContent = progress.path || progress.message || '-';
 }
 
+function syncNativeMenuState() {
+  const snapshot = {
+    hasProfile: Boolean(getSelectedProfile()),
+    hasPlan: Boolean(state.currentPlan && Array.isArray(state.currentPlan.actions) && state.currentPlan.actions.length > 0),
+    checkRunning: state.checkRunning,
+    installRunning: state.installRunning,
+    installPaused: state.installPaused,
+    appUpdateRunning: state.appUpdateRunning
+  };
+
+  const key = JSON.stringify(snapshot);
+  if (key === lastMenuStateSnapshot) {
+    return;
+  }
+
+  lastMenuStateSnapshot = key;
+  window.aeroApi.updateMenuState(snapshot).catch(() => {
+    // Ignore menu sync errors if menu is unavailable in this environment.
+  });
+}
+
 function syncActionButtons() {
   const lockProfileUi = state.installRunning || state.checkRunning;
   const hasPlanActions = Boolean(state.currentPlan && state.currentPlan.actions && state.currentPlan.actions.length > 0);
@@ -327,6 +363,8 @@ function syncActionButtons() {
   el.languageSelect.disabled = lockProfileUi || state.i18n.languages.length === 0;
   el.btnPause.textContent = state.installPaused ? t('btn.resume') : t('btn.pause');
   el.profileList.classList.toggle('blocked', lockProfileUi);
+
+  syncNativeMenuState();
 }
 
 function syncFreshModeUi() {
@@ -798,6 +836,124 @@ async function onCheckAppUpdate() {
   }
 }
 
+function onCreateNewProfile() {
+  state.selectedProfileId = null;
+  state.currentPlan = null;
+  fillForm(null);
+  el.selectedProfileName.textContent = t('profile.new');
+  resetSummary();
+  resetProgressUi();
+  renderActions([]);
+  syncActionButtons();
+  setStatus(t('status.newProfile'));
+}
+
+async function onSaveProfileClicked() {
+  try {
+    await saveProfile();
+  } catch (error) {
+    log(t('log.saveError', { message: error.message }));
+    window.alert(t('alert.saveFailed', { message: error.message }));
+  }
+}
+
+async function onDeleteProfileClicked() {
+  const selected = getSelectedProfile();
+  if (!selected) {
+    return;
+  }
+
+  const yes = window.confirm(t('confirm.deleteProfile', { name: selected.name }));
+  if (!yes) {
+    return;
+  }
+
+  try {
+    state.profiles = await window.aeroApi.deleteProfile(selected.id);
+    state.selectedProfileId = state.profiles[0]?.id || null;
+    await loadProfiles();
+    state.currentPlan = null;
+    resetSummary();
+    resetProgressUi();
+    renderActions([]);
+    syncActionButtons();
+    log(t('log.profileDeleted', { name: selected.name }));
+    setStatus(t('status.profileDeleted'));
+  } catch (error) {
+    log(t('log.deleteError', { message: error.message }));
+    window.alert(t('alert.deleteFailed', { message: error.message }));
+  }
+}
+
+async function onPickDirectoryClicked() {
+  try {
+    const chosen = await window.aeroApi.pickDirectory();
+    if (chosen) {
+      el.productDir.value = chosen;
+    }
+  } catch (error) {
+    log(t('log.pickDirError', { message: error.message }));
+    window.alert(t('alert.pickDirFailed', { message: error.message }));
+  }
+}
+
+function onClearLog() {
+  el.logBox.textContent = '';
+}
+
+async function onOpenSelectedProfileDirectory() {
+  const selected = getSelectedProfile();
+  const targetPath = String(el.productDir.value || selected?.productDir || '').trim();
+
+  if (!targetPath) {
+    return;
+  }
+
+  try {
+    await window.aeroApi.openPath(targetPath);
+  } catch (error) {
+    log(t('log.openPathError', { message: error.message }));
+    window.alert(t('alert.openPathFailed', { message: error.message }));
+  }
+}
+
+async function handleMenuAction(action) {
+  switch (String(action || '')) {
+    case MENU_ACTIONS.PROFILE_NEW:
+      onCreateNewProfile();
+      return;
+    case MENU_ACTIONS.PROFILE_SAVE:
+      await onSaveProfileClicked();
+      return;
+    case MENU_ACTIONS.PROFILE_DELETE:
+      await onDeleteProfileClicked();
+      return;
+    case MENU_ACTIONS.PROFILE_OPEN_DIR:
+      await onOpenSelectedProfileDirectory();
+      return;
+    case MENU_ACTIONS.UPDATES_CHECK:
+      await onCheckUpdates();
+      return;
+    case MENU_ACTIONS.UPDATES_INSTALL:
+      await onInstallUpdates();
+      return;
+    case MENU_ACTIONS.UPDATES_PAUSE_RESUME:
+      await onTogglePauseInstall();
+      return;
+    case MENU_ACTIONS.UPDATES_CANCEL:
+      await onCancelInstall();
+      return;
+    case MENU_ACTIONS.APP_CHECK_UPDATE:
+      await onCheckAppUpdate();
+      return;
+    case MENU_ACTIONS.LOG_CLEAR:
+      onClearLog();
+      return;
+    default:
+      return;
+  }
+}
+
 async function onCancelInstall() {
   if (!state.installRunning) {
     return;
@@ -823,65 +979,15 @@ async function onCancelInstall() {
 }
 
 function wireEvents() {
-  el.btnNewProfile.addEventListener('click', () => {
-    state.selectedProfileId = null;
-    state.currentPlan = null;
-    fillForm(null);
-    el.selectedProfileName.textContent = t('profile.new');
-    resetSummary();
-    resetProgressUi();
-    renderActions([]);
-    syncActionButtons();
-    setStatus(t('status.newProfile'));
+  el.btnNewProfile.addEventListener('click', onCreateNewProfile);
+  el.btnSaveProfile.addEventListener('click', () => {
+    void onSaveProfileClicked();
   });
-
-  el.btnSaveProfile.addEventListener('click', async () => {
-    try {
-      await saveProfile();
-    } catch (error) {
-      log(t('log.saveError', { message: error.message }));
-      window.alert(t('alert.saveFailed', { message: error.message }));
-    }
+  el.btnDeleteProfile.addEventListener('click', () => {
+    void onDeleteProfileClicked();
   });
-
-  el.btnDeleteProfile.addEventListener('click', async () => {
-    const selected = getSelectedProfile();
-    if (!selected) {
-      return;
-    }
-
-    const yes = window.confirm(t('confirm.deleteProfile', { name: selected.name }));
-    if (!yes) {
-      return;
-    }
-
-    try {
-      state.profiles = await window.aeroApi.deleteProfile(selected.id);
-      state.selectedProfileId = state.profiles[0]?.id || null;
-      await loadProfiles();
-      state.currentPlan = null;
-      resetSummary();
-      resetProgressUi();
-      renderActions([]);
-      syncActionButtons();
-      log(t('log.profileDeleted', { name: selected.name }));
-      setStatus(t('status.profileDeleted'));
-    } catch (error) {
-      log(t('log.deleteError', { message: error.message }));
-      window.alert(t('alert.deleteFailed', { message: error.message }));
-    }
-  });
-
-  el.btnPickDir.addEventListener('click', async () => {
-    try {
-      const chosen = await window.aeroApi.pickDirectory();
-      if (chosen) {
-        el.productDir.value = chosen;
-      }
-    } catch (error) {
-      log(t('log.pickDirError', { message: error.message }));
-      window.alert(t('alert.pickDirFailed', { message: error.message }));
-    }
+  el.btnPickDir.addEventListener('click', () => {
+    void onPickDirectoryClicked();
   });
 
   el.languageSelect.addEventListener('change', async () => {
@@ -892,14 +998,26 @@ function wireEvents() {
     }
   });
 
-  el.btnCheckAppUpdate.addEventListener('click', onCheckAppUpdate);
-  el.btnCheck.addEventListener('click', onCheckUpdates);
-  el.btnInstall.addEventListener('click', onInstallUpdates);
-  el.btnPause.addEventListener('click', onTogglePauseInstall);
-  el.btnCancel.addEventListener('click', onCancelInstall);
+  el.btnCheckAppUpdate.addEventListener('click', () => {
+    void onCheckAppUpdate();
+  });
+  el.btnCheck.addEventListener('click', () => {
+    void onCheckUpdates();
+  });
+  el.btnInstall.addEventListener('click', () => {
+    void onInstallUpdates();
+  });
+  el.btnPause.addEventListener('click', () => {
+    void onTogglePauseInstall();
+  });
+  el.btnCancel.addEventListener('click', () => {
+    void onCancelInstall();
+  });
   el.optFresh.addEventListener('change', syncFreshModeUi);
-  el.btnClearLog.addEventListener('click', () => {
-    el.logBox.textContent = '';
+  el.btnClearLog.addEventListener('click', onClearLog);
+
+  window.aeroApi.onMenuAction((action) => {
+    void handleMenuAction(action);
   });
 
   window.aeroApi.onProgress((progress) => {
