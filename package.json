@@ -1,10 +1,13 @@
 {
   "name": "aerosync-addon-updater",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "description": "Desktop updater for X-Plane aircraft using the X-Updater service with multi-profile management",
   "main": "main.js",
   "private": true,
-  "author": "Tim Rosenhagen",
+  "author": {
+    "name": "Tim Rosenhagen",
+    "email": "49558999+NichSchlagen@users.noreply.github.com"
+  },
   "scripts": {
     "start": "electron .",
     "start:linux": "env -u ELECTRON_RUN_AS_NODE electron .",
@@ -12,7 +15,10 @@
     "build:appimage": "electron-builder --linux AppImage",
     "build:win": "npm run build:win:setup && npm run build:win:portable",
     "build:win:setup": "electron-builder --win nsis --config.artifactName=\"${productName}-${version}-${arch}-setup.${ext}\"",
-    "build:win:portable": "electron-builder --win portable --config.artifactName=\"${productName}-${version}-${arch}-portable.${ext}\""
+    "build:win:portable": "electron-builder --win portable --config.artifactName=\"${productName}-${version}-${arch}-portable.${ext}\"",
+    "build:deb": "electron-builder --linux deb",
+    "build:rpm": "electron-builder --linux rpm",
+    "build:linux": "npm run build:appimage && npm run build:deb && npm run build:rpm"
   },
   "devDependencies": {
     "electron": "^40.4.1",
@@ -35,7 +41,8 @@
         "AppImage"
       ],
       "category": "Utility",
-      "icon": "build/icons/icon.png"
+      "icon": "build/icons/icon.png",
+      "maintainer": "Tim Rosenhagen <49558999+NichSchlagen@users.noreply.github.com>"
     },
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "extraResources": [

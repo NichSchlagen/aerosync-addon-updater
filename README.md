@@ -96,6 +96,38 @@ Expected artifact pattern:
 
 - `dist/AeroSync.Addon.Updater-<version>-x86_64.AppImage`
 
+### Linux DEB
+
+```bash
+npm run build:deb
+```
+
+Expected artifact pattern:
+
+- `dist/*.<arch>.deb` (exact naming depends on electron-builder)
+
+### Linux RPM
+
+```bash
+npm run build:rpm
+```
+
+Expected artifact pattern:
+
+- `dist/*.rpm`
+
+Note: `rpmbuild` is required for local RPM builds. On Debian/Ubuntu:
+
+```bash
+sudo apt-get install rpm
+```
+
+### Build All Linux Variants
+
+```bash
+npm run build:linux
+```
+
 ### Windows Setup EXE (NSIS)
 
 ```bash
@@ -131,7 +163,7 @@ If you run into problems, please open a GitHub issue with:
 ## Language System
 
 - English is the default application language.
-- In packaged builds (AppImage/Windows), languages are loaded from bundled app resources automatically.
+- In packaged builds (AppImage/DEB/RPM/Windows), languages are loaded from bundled app resources automatically.
 - In development, languages are loaded from the local `languages/` folder.
 - You can override the language directory with:
 
