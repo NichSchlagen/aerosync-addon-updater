@@ -19,10 +19,23 @@ Full documentation is available in [`docs/`](./docs/README.md):
 - Manage multiple profiles (different aircraft folders, channels, and credentials)
 - Authenticate against `https://update.x-plane.org`
 - Check updates for `release`, `beta`, or `alpha`
-- Build update plans (including fresh install mode)
+- Build update plans in normal, fresh install, or repair/verify mode
 - Verify files with MD5
 - Download, unpack (gzip when required), and install updates
 - Pause, resume, and cancel running installations
+- Check for new app versions from GitHub releases
+- Provide native application menu actions and keyboard shortcuts
+
+## App Update Checker
+
+The app includes a built-in checker for new AeroSync releases.
+
+- Use the top-bar button `Check app update`, or menu `Actions -> Check App Update` (`Ctrl/Cmd + U`)
+- The current installed app version is shown in the version chip (`vX.Y.Z`)
+- The checker compares your local version against the latest GitHub release tag
+- If a newer version is available, the app asks whether to open the release page
+- If no newer version exists, status/log shows `up to date`
+- If the check fails (for example API rate limit), the error is shown in status/log and alert dialog
 
 ## Original Jar Client Notes
 
@@ -115,7 +128,6 @@ If you run into problems, please open a GitHub issue with:
 - the error description/message
 - the steps that trigger the issue
 
-
 ## Language System
 
 - English is the default application language.
@@ -149,4 +161,6 @@ If you add or improve a translation, please open a Pull Request on GitHub and in
 
 ## Notes
 
+- Fresh install and repair/verify are mutually exclusive in the UI.
+- In repair/verify mode, `Snapshot number (since)` is ignored and a full hash verification is planned.
 - The remote update API may change over time; endpoint and payload mapping may require updates.

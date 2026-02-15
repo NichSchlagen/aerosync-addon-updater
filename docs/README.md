@@ -26,4 +26,5 @@ These docs describe the current Electron implementation in this repository:
 - UI and profile workflow
 - Update planning and installation behavior
 - Credentials and language handling
+- App update checker behavior and limitations
 - Build and release automation
