@@ -32,10 +32,22 @@ For each product:
 
 - fetch file list (`xu:files` link)
 - resolve target directory from product location + detection rules
-- build actions:
-  - `delete` actions for server `DELETE`
-  - `update` actions for ADD/UPDATE or hash mismatch
-  - in fresh mode: additional deletes for local files absent on server
+- build actions depending on selected mode
+
+Mode behavior:
+
+- Normal mode:
+  - uses `since = profile.packageVersion`
+  - creates `update` for needed ADD/UPDATE items
+  - creates `delete` for server `DELETE` items
+- Fresh mode:
+  - forces `since = 0`
+  - normal mode behavior plus cleanup deletes for local files not present on server list
+- Repair/verify mode:
+  - forces `since = 0`
+  - hash-checks all known files from server list
+  - creates `update` for missing/hash-mismatched files
+  - skips fresh cleanup deletes for unknown extra local files
 
 Actions are ordered as:
 

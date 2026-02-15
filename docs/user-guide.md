@@ -15,6 +15,7 @@ Fields:
 - `Snapshot number (since)`: baseline snapshot for incremental checks
 - `Ignore list`: paths or patterns to skip during plan/install (one per line)
 - `Fresh Install`: force full reconciliation against current snapshot
+- `Repair / Verify`: hash-check all known files and re-download mismatches
 - `Store credentials in profile`: save credentials for reuse
 
 ## Release Channel Behavior
@@ -30,7 +31,7 @@ It defines from which snapshot onward changes are requested.
 
 - Higher value = smaller incremental plan if you are up to date
 - `0` = broad/full change list from server perspective
-- With `Fresh Install`, `since` is ignored
+- With `Fresh Install` or `Repair / Verify`, `since` is ignored
 
 ## Standard Workflow
 
@@ -43,17 +44,7 @@ It defines from which snapshot onward changes are requested.
 
 After a successful install, the app updates `Snapshot number (since)` automatically to the new snapshot.
 
-## During Installation
-
-Available controls:
-
-- `Pause`: waits at safe boundary between file actions
-- `Resume`: continues processing actions
-- `Cancel`: aborts current run and marks run as cancelled
-
-While check/install is running, profile switching and profile edits are blocked.
-
-## Fresh Install vs Normal Update
+## Update Modes
 
 Normal update:
 
@@ -66,6 +57,56 @@ Fresh install:
 - Rebuilds full target state
 - Adds delete actions for local files not present on server list
 - Useful for cleaning inconsistent product folders
+
+Repair / Verify:
+
+- Requests full known file list and checks local hashes
+- Re-downloads files that are missing or hash-mismatched
+- Does not perform fresh cleanup deletes for unknown extra files
+- Best for fixing broken installs without aggressive cleanup
+
+`Fresh Install` and `Repair / Verify` are mutually exclusive in the UI.
+
+## During Installation
+
+Available controls:
+
+- `Pause`: waits at safe boundary between file actions
+- `Resume`: continues processing actions
+- `Cancel`: aborts current run and marks run as cancelled
+
+While check/install is running, profile switching and profile edits are blocked.
+
+## App Menu And Shortcuts
+
+The native menu provides the same core actions as the UI.
+
+Examples:
+
+- `F5`: Check updates
+- `Ctrl/Cmd + I`: Install updates
+- `Ctrl/Cmd + P`: Pause/Resume installation
+- `Esc`: Cancel installation
+- `Ctrl/Cmd + S`: Save profile
+
+## App Update Checker
+
+The app can check whether a newer AeroSync version is available on GitHub.
+
+How to run it:
+
+- top bar button: `Check app update`
+- menu: `Actions -> Check App Update`
+- shortcut: `Ctrl/Cmd + U`
+
+What it does:
+
+- reads your installed app version
+- requests the latest release metadata from GitHub
+- compares versions and reports `update available` or `up to date`
+- prompts to open the release page when an update is found
+
+The checker does not auto-download or auto-install app updates.
 
 ## Ignore List
 
