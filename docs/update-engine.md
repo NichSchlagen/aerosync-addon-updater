@@ -32,6 +32,7 @@ For each product:
 
 - fetch file list (`xu:files` link)
 - resolve target directory from product location + detection rules
+- if detection markers are missing, treat package as optional and skip it with warning
 - build actions depending on selected mode
 
 Mode behavior:
@@ -54,7 +55,15 @@ Actions are ordered as:
 1. all deletes
 2. all updates
 
-## 5) Size Summary
+## 5) Ignore Filtering
+
+After actions are built, ignore rules are applied.
+
+- rules can match exact paths, folder prefixes, wildcards, or basename-only entries
+- ignored actions are removed from the final plan
+- summary keeps `ignoredCount` and warnings mention skip count
+
+## 6) Size Summary
 
 Summary includes:
 
@@ -65,7 +74,7 @@ Summary includes:
 
 This is why network download can be much smaller than disk size.
 
-## 6) Install Execution
+## 7) Install Execution
 
 For each action:
 
@@ -80,7 +89,7 @@ For each action:
 
 If checksum remains wrong, install fails with a checksum mismatch error.
 
-## 7) Completion
+## 8) Completion
 
 On success:
 

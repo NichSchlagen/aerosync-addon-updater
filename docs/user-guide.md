@@ -16,7 +16,7 @@ Fields:
 - `Ignore list`: paths or patterns to skip during plan/install (one per line)
 - `Fresh Install`: force full reconciliation against current snapshot
 - `Repair / Verify`: hash-check all known files and re-download mismatches
-- `Store credentials in profile`: save credentials for reuse
+- `Store credentials in profile`: save credentials for reuse; if disabled, credentials stay only in the current app session
 
 ## Release Channel Behavior
 
@@ -43,6 +43,7 @@ It defines from which snapshot onward changes are requested.
 6. Wait until completion.
 
 After a successful install, the app updates `Snapshot number (since)` automatically to the new snapshot.
+If profile fields changed, `Check Updates` auto-saves the profile before starting.
 
 ## Update Modes
 
@@ -62,10 +63,12 @@ Repair / Verify:
 
 - Requests full known file list and checks local hashes
 - Re-downloads files that are missing or hash-mismatched
-- Does not perform fresh cleanup deletes for unknown extra files
+- Does not perform fresh cleanup deletes for unknown extra local files
 - Best for fixing broken installs without aggressive cleanup
 
 `Fresh Install` and `Repair / Verify` are mutually exclusive in the UI.
+
+Packages whose detection markers are missing are treated as optional and skipped with a warning.
 
 ## During Installation
 
@@ -75,7 +78,7 @@ Available controls:
 - `Resume`: continues processing actions
 - `Cancel`: aborts current run and marks run as cancelled
 
-While check/install is running, profile switching and profile edits are blocked.
+While check/install is running, profile switching, profile edits, and language switching are blocked.
 
 ## App Menu And Shortcuts
 
@@ -88,6 +91,9 @@ Examples:
 - `Ctrl/Cmd + P`: Pause/Resume installation
 - `Esc`: Cancel installation
 - `Ctrl/Cmd + S`: Save profile
+- `Ctrl/Cmd + O`: Open aircraft folder
+- `Ctrl/Cmd + L`: Clear log
+- `Ctrl/Cmd + U`: Check app update
 
 ## App Update Checker
 
@@ -108,6 +114,12 @@ What it does:
 
 The checker does not auto-download or auto-install app updates.
 
+## Planned File Plan Table
+
+- For performance, the table renders up to 600 action rows.
+- The counter still shows the full action count.
+- If more rows exist, the last row shows how many entries are hidden.
+
 ## Ignore List
 
 Use one entry per line in the profile field.
@@ -117,6 +129,7 @@ Supported entries:
 - exact relative path (for example `objects/test.obj`)
 - folder prefix with trailing slash (for example `liveries/`)
 - simple wildcard patterns (for example `objects/**/*.dds`)
+- file name without slash matches in any folder (for example `thumbs.db`)
 - lines starting with `#` are comments
 
 Ignored files are removed from the action plan and counted in check summary/log output.
