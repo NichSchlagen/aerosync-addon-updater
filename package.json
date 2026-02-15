@@ -15,8 +15,8 @@
     "build:win:portable": "electron-builder --win portable --config.artifactName=\"${productName}-${version}-${arch}-portable.${ext}\""
   },
   "devDependencies": {
-    "electron": "^33.2.0",
-    "electron-builder": "^24.13.3"
+    "electron": "^40.4.1",
+    "electron-builder": "^26.7.0"
   },
   "build": {
     "appId": "com.aerosync.addonupdater",
