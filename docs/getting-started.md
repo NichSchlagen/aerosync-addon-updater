@@ -32,6 +32,30 @@ Linux AppImage:
 npm run build:appimage
 ```
 
+Linux DEB:
+
+```bash
+npm run build:deb
+```
+
+Linux RPM:
+
+```bash
+npm run build:rpm
+```
+
+Note: `rpmbuild` is required for local RPM builds. On Debian/Ubuntu:
+
+```bash
+sudo apt-get install rpm
+```
+
+All Linux variants:
+
+```bash
+npm run build:linux
+```
+
 Windows setup EXE:
 
 ```bash

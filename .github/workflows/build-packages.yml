@@ -26,6 +26,20 @@ jobs:
             artifact_paths: |
               dist/*.AppImage
 
+          - name: Linux DEB
+            os: ubuntu-latest
+            build_command: npm run build:deb
+            artifact_prefix: aerosync-linux-deb
+            artifact_paths: |
+              dist/*.deb
+
+          - name: Linux RPM
+            os: ubuntu-latest
+            build_command: npm run build:rpm
+            artifact_prefix: aerosync-linux-rpm
+            artifact_paths: |
+              dist/*.rpm
+
           - name: Windows Setup
             os: windows-latest
             build_command: npm run build:win:setup
@@ -52,6 +66,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Install rpmbuild tooling (Linux RPM job)
+        if: matrix.artifact_prefix == 'aerosync-linux-rpm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
 
       - name: Build package
         env:
@@ -83,6 +103,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: |
             release-assets/*.AppImage
+            release-assets/*.deb
+            release-assets/*.rpm
             release-assets/*-setup.exe
             release-assets/*-portable.exe
           fail_on_unmatched_files: true

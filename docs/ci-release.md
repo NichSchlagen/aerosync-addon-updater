@@ -18,6 +18,8 @@ git push origin v1.0.0
 The workflow builds:
 
 - Linux AppImage on `ubuntu-latest`
+- Linux DEB on `ubuntu-latest`
+- Linux RPM on `ubuntu-latest`
 - Windows setup EXE on `windows-latest`
 - Windows portable EXE on `windows-latest`
 
@@ -33,6 +35,8 @@ A separate release job:
 Uploaded release files are limited to:
 
 - `*.AppImage`
+- `*.deb`
+- `*.rpm`
 - `*-setup.exe`
 - `*-portable.exe`
 
