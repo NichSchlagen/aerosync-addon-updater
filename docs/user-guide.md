@@ -38,9 +38,10 @@ It defines from which snapshot onward changes are requested.
 1. Select or create profile.
 2. Save profile.
 3. Click `Check Updates`.
-4. Review summary and file plan.
-5. Click `Install`.
-6. Wait until completion.
+4. Review optional package choices (`Install` / `Ignore`) and, if needed, change them in the `Optional packages` panel.
+5. Review summary and file plan.
+6. Click `Install`.
+7. Wait until completion.
 
 After a successful install, the app updates `Snapshot number (since)` automatically to the new snapshot.
 If profile fields changed, `Check Updates` auto-saves the profile before starting.
@@ -68,7 +69,11 @@ Repair / Verify:
 
 `Fresh Install` and `Repair / Verify` are mutually exclusive in the UI.
 
-Packages whose detection markers are missing are treated as optional and skipped with a warning.
+Optional packages are listed in the `Optional packages` panel:
+
+- each package can be set to `Install` or `Ignore`
+- defaults are based on detection markers (`Install` when detected, `Ignore` when missing)
+- changing a package action triggers a fresh check and rebuilds the plan
 
 ## During Installation
 
