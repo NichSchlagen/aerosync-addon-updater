@@ -12,6 +12,20 @@ Actions:
 2. re-save profile
 3. retry check
 
+## Stored Credentials Cannot Be Used
+
+Symptoms:
+
+- check fails with message about credentials that cannot be decrypted
+- stored login/key are unexpectedly empty
+
+Actions:
+
+1. enter login and license key again in the form
+2. keep `Store credentials in profile` enabled
+3. save profile
+4. run `Check Updates` again
+
 ## App Update Check Failed
 
 Symptoms:
@@ -45,6 +59,19 @@ Actions:
 3. if still unexpected, enable `Repair / Verify`
 4. run `Check Updates` again
 
+## Optional Package Skipped (Detection Markers Missing)
+
+Symptoms:
+
+- log shows a hint that a package is not relevant and was skipped
+- expected optional package files are missing from plan
+
+Actions:
+
+1. verify profile `Product Directory` points to the correct aircraft root
+2. verify the expected marker files/folders for that package exist locally
+3. run `Check Updates` again
+
 ## Installed Version Is "Latest" But Plan Still Looks Wrong
 
 Actions:
@@ -73,6 +100,22 @@ Actions:
 2. retry install
 3. if it keeps failing, run `Repair / Verify` mode once
 4. if persistent, open a GitHub issue with exact error and file path
+
+## Planned File Table Looks Incomplete
+
+Symptoms:
+
+- summary/counter shows many actions
+- table shows fewer rows than expected
+
+Cause:
+
+- UI renders up to 600 rows for performance
+
+Actions:
+
+1. rely on summary and action counter for total size/count
+2. install is still processed against full internal plan
 
 ## Alpha/Beta Not Available
 
