@@ -20,6 +20,7 @@ const state = {
   profiles: [],
   selectedProfileId: null,
   currentPlan: null,
+  optionalPackageSelection: {},
   checkRunning: false,
   installRunning: false,
   installPaused: false,
@@ -70,6 +71,9 @@ const el = {
   sumDownload: document.getElementById('sumDownload'),
   sumDisk: document.getElementById('sumDisk'),
   sumWarnings: document.getElementById('sumWarnings'),
+  optionalPackageCount: document.getElementById('optionalPackageCount'),
+  optionalPackagesEmpty: document.getElementById('optionalPackagesEmpty'),
+  optionalPackagesList: document.getElementById('optionalPackagesList'),
   actionCount: document.getElementById('actionCount'),
   progressLabel: document.getElementById('progressLabel'),
   progressPercent: document.getElementById('progressPercent'),
@@ -147,6 +151,37 @@ function formatIgnoreListOutput(entries) {
   }
 
   return entries.join('\n');
+}
+
+function normalizeOptionalPackageAction(value, fallback = 'ignore') {
+  const action = String(value || '').trim().toLowerCase();
+  if (action === 'install' || action === 'ignore') {
+    return action;
+  }
+
+  return fallback;
+}
+
+function syncOptionalSelectionFromPlan(optionalPackages) {
+  const out = {};
+
+  if (Array.isArray(optionalPackages)) {
+    for (const item of optionalPackages) {
+      const id = String(item && item.id ? item.id : '').trim();
+      if (!id) {
+        continue;
+      }
+
+      out[id] = normalizeOptionalPackageAction(item.selectedAction, 'ignore');
+    }
+  }
+
+  state.optionalPackageSelection = out;
+}
+
+function resetOptionalPackages() {
+  state.optionalPackageSelection = {};
+  renderOptionalPackages([]);
 }
 
 function escapeHtml(input) {
@@ -258,12 +293,14 @@ async function loadAndApplyLanguage(code, options = {}) {
   syncActionButtons();
   renderProfiles();
   renderActions(state.currentPlan?.actions || []);
+  renderOptionalPackages(state.currentPlan?.optionalPackages || []);
 
   if (state.currentPlan) {
     applyPlanToUi({
       summary: state.currentPlan.summary,
       actions: state.currentPlan.actions,
-      warnings: []
+      warnings: [],
+      optionalPackages: state.currentPlan.optionalPackages || []
     });
   } else {
     resetSummary();
@@ -364,6 +401,11 @@ function syncActionButtons() {
   el.languageSelect.disabled = lockProfileUi || state.i18n.languages.length === 0;
   el.btnPause.textContent = state.installPaused ? t('btn.resume') : t('btn.pause');
   el.profileList.classList.toggle('blocked', lockProfileUi);
+  el.optionalPackagesList
+    .querySelectorAll('select[data-optional-package-id]')
+    .forEach((node) => {
+      node.disabled = lockProfileUi;
+    });
 
   syncNativeMenuState();
 }
@@ -442,6 +484,62 @@ function resetSummary() {
   el.actionCount.textContent = t('count.entries', { count: 0 });
 }
 
+function renderOptionalPackages(optionalPackages) {
+  const packages = Array.isArray(optionalPackages) ? optionalPackages : [];
+  el.optionalPackageCount.textContent = t('count.entries', { count: packages.length });
+
+  if (packages.length === 0) {
+    el.optionalPackagesEmpty.hidden = false;
+    el.optionalPackagesList.innerHTML = '';
+    return;
+  }
+
+  el.optionalPackagesEmpty.hidden = true;
+  const lockProfileUi = state.installRunning || state.checkRunning;
+
+  const rows = packages
+    .map((item) => {
+      const id = escapeHtml(String(item && item.id ? item.id : ''));
+      const packageName = escapeHtml(String(item && item.name ? item.name : ''));
+      const detected = Boolean(item && item.detected);
+      const defaultAction = normalizeOptionalPackageAction(
+        item && item.defaultAction,
+        detected ? 'install' : 'ignore'
+      );
+      const selectedAction = normalizeOptionalPackageAction(
+        item && item.selectedAction,
+        defaultAction
+      );
+      const hint = detected
+        ? t('optional.detected')
+        : t('optional.missingDetection');
+      const customChoice = selectedAction !== defaultAction
+        ? ` ${t('optional.customChoice')}`
+        : '';
+      const installSelected = selectedAction === 'install' ? ' selected' : '';
+      const ignoreSelected = selectedAction === 'ignore' ? ' selected' : '';
+
+      return `
+        <div class="optional-package-item">
+          <div class="optional-package-meta">
+            <div class="optional-package-name" title="${packageName}">${packageName}</div>
+            <div class="optional-package-hint">${escapeHtml(`${hint}${customChoice}`)}</div>
+          </div>
+          <label class="optional-package-choice">
+            <span>${escapeHtml(t('optional.choice'))}</span>
+            <select data-optional-package-id="${id}" data-optional-package-name="${packageName}"${lockProfileUi ? ' disabled' : ''}>
+              <option value="install"${installSelected}>${escapeHtml(t('optional.actionInstall'))}</option>
+              <option value="ignore"${ignoreSelected}>${escapeHtml(t('optional.actionIgnore'))}</option>
+            </select>
+          </label>
+        </div>
+      `;
+    })
+    .join('');
+
+  el.optionalPackagesList.innerHTML = rows;
+}
+
 function renderActions(actions) {
   if (!Array.isArray(actions) || actions.length === 0) {
     el.actionsTableBody.innerHTML = `<tr><td colspan="4" class="empty">${escapeHtml(t('table.noUpdates'))}</td></tr>`;
@@ -516,6 +614,7 @@ function renderProfiles() {
       el.selectedProfileName.textContent = profile.name;
       renderProfiles();
       state.currentPlan = null;
+      resetOptionalPackages();
       resetSummary();
       resetProgressUi();
       renderActions([]);
@@ -544,6 +643,7 @@ async function loadProfiles() {
     el.selectedProfileName.textContent = t('profile.none');
   }
 
+  resetOptionalPackages();
   renderProfiles();
   syncActionButtons();
 }
@@ -621,6 +721,7 @@ function applyPlanToUi(planResult) {
   el.sumDisk.textContent = formatBytes(sum.diskSize);
   const warnings = Array.isArray(planResult.warnings) ? planResult.warnings : [];
   el.sumWarnings.textContent = `${warnings.length}`;
+  renderOptionalPackages(planResult.optionalPackages || []);
   renderActions(planResult.actions);
 }
 
@@ -644,6 +745,9 @@ async function onCheckUpdates() {
       fresh: el.optFresh.checked,
       repair: el.optRepair.checked
     };
+    if (Object.keys(state.optionalPackageSelection).length > 0) {
+      options.optionalPackages = { ...state.optionalPackageSelection };
+    }
 
     if (options.repair) {
       log(t('log.repairModeEnabled'));
@@ -657,12 +761,17 @@ async function onCheckUpdates() {
         licenseKey: el.licenseKey.value.trim()
       }
     });
+    const optionalPackages = Array.isArray(planResult.optionalPackages)
+      ? planResult.optionalPackages
+      : [];
+    syncOptionalSelectionFromPlan(optionalPackages);
 
     state.currentPlan = {
       planId: planResult.planId,
       profileId: profile.id,
       summary: planResult.summary,
-      actions: planResult.actions
+      actions: planResult.actions,
+      optionalPackages
     };
 
     applyPlanToUi(planResult);
@@ -691,6 +800,16 @@ async function onCheckUpdates() {
     if (Number(planResult.summary.ignoredCount || 0) > 0) {
       log(t('log.ignoreApplied', {
         count: planResult.summary.ignoredCount
+      }));
+    }
+    if (Number(planResult.summary.optionalIgnoredCount || 0) > 0) {
+      log(t('log.optionalIgnored', {
+        count: planResult.summary.optionalIgnoredCount
+      }));
+    }
+    if (Number(planResult.summary.optionalForcedInstallCount || 0) > 0) {
+      log(t('log.optionalForcedInstall', {
+        count: planResult.summary.optionalForcedInstallCount
       }));
     }
     if (Number(planResult.summary.downloadSizeUnknownCount || 0) > 0) {
@@ -868,6 +987,7 @@ async function onCheckAppUpdate() {
 function onCreateNewProfile() {
   state.selectedProfileId = null;
   state.currentPlan = null;
+  resetOptionalPackages();
   fillForm(null);
   el.selectedProfileName.textContent = t('profile.new');
   resetSummary();
@@ -1007,6 +1127,39 @@ async function onCancelInstall() {
   }
 }
 
+async function onOptionalPackageSelectionChanged(event) {
+  const target = event && event.target;
+  if (!target || target.tagName !== 'SELECT') {
+    return;
+  }
+
+  if (state.checkRunning || state.installRunning) {
+    return;
+  }
+
+  const packageId = String(target.getAttribute('data-optional-package-id') || '').trim();
+  if (!packageId) {
+    return;
+  }
+
+  const packageName = String(target.getAttribute('data-optional-package-name') || packageId);
+  const nextAction = normalizeOptionalPackageAction(target.value, 'ignore');
+  const prevAction = normalizeOptionalPackageAction(state.optionalPackageSelection[packageId], '');
+  if (nextAction === prevAction) {
+    return;
+  }
+
+  state.optionalPackageSelection[packageId] = nextAction;
+  log(t('log.optionalSelectionChanged', {
+    name: packageName,
+    action: nextAction === 'install'
+      ? t('optional.actionInstall')
+      : t('optional.actionIgnore')
+  }));
+
+  await onCheckUpdates();
+}
+
 function wireEvents() {
   el.btnNewProfile.addEventListener('click', onCreateNewProfile);
   el.btnSaveProfile.addEventListener('click', () => {
@@ -1045,6 +1198,9 @@ function wireEvents() {
   el.optFresh.addEventListener('change', onToggleFreshMode);
   el.optRepair.addEventListener('change', onToggleRepairMode);
   el.btnClearLog.addEventListener('click', onClearLog);
+  el.optionalPackagesList.addEventListener('change', (event) => {
+    void onOptionalPackageSelectionChanged(event);
+  });
 
   window.aeroApi.onMenuAction((action) => {
     void handleMenuAction(action);

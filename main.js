@@ -409,6 +409,39 @@ function registerIpcHandlers() {
     return text;
   };
 
+  const sanitizeCheckOptions = (rawOptions) => {
+    const source = rawOptions && typeof rawOptions === 'object' && !Array.isArray(rawOptions)
+      ? rawOptions
+      : {};
+    const normalized = {
+      alpha: Boolean(source.alpha),
+      beta: Boolean(source.beta),
+      fresh: Boolean(source.fresh),
+      repair: Boolean(source.repair)
+    };
+
+    const rawOptionalPackages = source.optionalPackages;
+    if (rawOptionalPackages && typeof rawOptionalPackages === 'object' && !Array.isArray(rawOptionalPackages)) {
+      const optionalPackages = {};
+
+      for (const [rawId, rawAction] of Object.entries(rawOptionalPackages)) {
+        const id = String(rawId || '').trim();
+        if (!id) {
+          continue;
+        }
+
+        const action = String(rawAction || '').trim().toLowerCase();
+        if (action === 'install' || action === 'ignore') {
+          optionalPackages[id] = action;
+        }
+      }
+
+      normalized.optionalPackages = optionalPackages;
+    }
+
+    return normalized;
+  };
+
   const buildRuntimeProfileWithCredentials = (profile, requestPayload = {}) => {
     if (!profile) {
       throw new Error('Profile not found.');
@@ -546,9 +579,10 @@ function registerIpcHandlers() {
     const profileId = assertNonEmptyString('profileId', payload.profileId);
     const profile = profileStore.getProfile(profileId);
     const runtimeProfile = buildRuntimeProfileWithCredentials(profile, payload);
+    const options = sanitizeCheckOptions(payload.options);
 
     try {
-      return await updaterClient.createUpdatePlan(runtimeProfile, payload.options || {});
+      return await updaterClient.createUpdatePlan(runtimeProfile, options);
     } catch (error) {
       throw mapUpdaterError(error);
     }

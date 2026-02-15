@@ -32,7 +32,10 @@ For each product:
 
 - fetch file list (`xu:files` link)
 - resolve target directory from product location + detection rules
-- if detection markers are missing, treat package as optional and skip it with warning
+- for products with detection markers, expose package decision `install` / `ignore`
+- default decision is `install` when markers are detected, otherwise `ignore`
+- if an optional package is set to ignore, skip it with warning
+- if an optional package is forced to install without markers, include it and add warning
 - build actions depending on selected mode
 
 Mode behavior:

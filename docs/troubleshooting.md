@@ -59,18 +59,19 @@ Actions:
 3. if still unexpected, enable `Repair / Verify`
 4. run `Check Updates` again
 
-## Optional Package Skipped (Detection Markers Missing)
+## Optional Package Missing From Plan
 
 Symptoms:
 
-- log shows a hint that a package is not relevant and was skipped
-- expected optional package files are missing from plan
+- package is shown in `Optional packages`, but expected files are missing from plan
+- log shows a hint that the package was ignored or skipped
 
 Actions:
 
-1. verify profile `Product Directory` points to the correct aircraft root
-2. verify the expected marker files/folders for that package exist locally
-3. run `Check Updates` again
+1. in `Optional packages`, set the package action to `Install`
+2. run `Check Updates` again (the app also does this automatically when action changes)
+3. verify profile `Product Directory` points to the correct aircraft root
+4. if markers are expected, verify marker files/folders exist locally
 
 ## Installed Version Is "Latest" But Plan Still Looks Wrong
 
