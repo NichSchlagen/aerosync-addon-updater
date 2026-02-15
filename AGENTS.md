@@ -39,7 +39,7 @@ The goal is to keep agent work safe, consistent, and free of functional regressi
 6. All server file paths must be normalized and checked for traversal (`normalizeRelPath` and root boundary checks).
 7. Installation order must remain: all `delete` actions first, then all `update` actions.
 8. File integrity is MD5-based; on raw mismatch, gunzip hash fallback is required.
-9. Optional packages without detection markers must be skipped with a warning, not treated as hard errors.
+9. Optional packages without detection markers default to `ignore` with a warning; explicit user override (`install`) is allowed and must also emit a warning.
 10. `rememberAuth = false` must never persist credentials to `profiles.json`.
 11. If `safeStorage` is unavailable, the app must remain functional (with warning behavior).
 12. Language loading must merge with a fallback language (prefer `en`) so missing keys do not break the UI.

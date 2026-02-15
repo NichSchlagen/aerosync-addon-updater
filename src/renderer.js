@@ -506,10 +506,11 @@ function renderOptionalPackages(optionalPackages) {
         item && item.defaultAction,
         detected ? 'install' : 'ignore'
       );
-      const selectedAction = normalizeOptionalPackageAction(
+      const selectedActionRaw = normalizeOptionalPackageAction(
         item && item.selectedAction,
         defaultAction
       );
+      const selectedAction = selectedActionRaw;
       const hint = detected
         ? t('optional.detected')
         : t('optional.missingDetection');
