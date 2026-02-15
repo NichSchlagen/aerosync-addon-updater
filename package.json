@@ -1,6 +1,6 @@
 {
   "name": "aerosync-addon-updater",
-  "version": "v1.0.4",
+  "version": "1.2.0",
   "description": "Desktop updater for X-Plane aircraft using the X-Updater service with multi-profile management",
   "main": "main.js",
   "private": true,
