@@ -167,12 +167,6 @@ h3 {
   letter-spacing: 0.03em;
 }
 
-.hint {
-  margin: 4px 0 10px;
-  color: var(--text-muted);
-  font-size: 0.84rem;
-  line-height: 1.35;
-}
 
 .profile-list {
   list-style: none;
