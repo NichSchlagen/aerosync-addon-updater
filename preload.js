@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('aeroApi', {
   listLanguages: () => ipcRenderer.invoke('i18n:list'),
   loadLanguage: (payload) => ipcRenderer.invoke('i18n:load', payload),
 
+  getAppVersion: () => ipcRenderer.invoke('app:get-version'),
+  checkAppUpdate: () => ipcRenderer.invoke('app:update-check'),
+  openExternalUrl: (url) => ipcRenderer.invoke('app:open-external', { url }),
+
   checkUpdates: (payload) => ipcRenderer.invoke('updates:check', payload),
   installUpdates: (payload) => ipcRenderer.invoke('updates:install', payload),
   pauseInstall: () => ipcRenderer.invoke('updates:pause'),
