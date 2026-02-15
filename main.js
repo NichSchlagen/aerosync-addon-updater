@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, dialog, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } = require('electron');
 
 const { ProfileStore } = require('./lib/profile-store');
 const { LanguageStore } = require('./lib/language-store');
@@ -11,6 +11,99 @@ let profileStore;
 let languageStore;
 let updaterClient;
 let activeInstall = null;
+
+const APP_UPDATE_REPO = {
+  owner: 'NichSchlagen',
+  repo: 'aerosync-addon-updater'
+};
+
+const APP_UPDATE_RELEASES_URL = `https://github.com/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases`;
+const APP_UPDATE_API_LATEST_URL = `https://api.github.com/repos/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases/latest`;
+
+function normalizeVersionParts(rawVersion) {
+  const match = String(rawVersion || '').trim().match(/^v?(\d+(?:\.\d+)*)/i);
+  if (!match) {
+    return [];
+  }
+
+  return match[1]
+    .split('.')
+    .map((part) => Number.parseInt(part, 10))
+    .filter((part) => Number.isFinite(part));
+}
+
+function compareVersionTags(left, right) {
+  const leftParts = normalizeVersionParts(left);
+  const rightParts = normalizeVersionParts(right);
+
+  if (leftParts.length === 0 && rightParts.length === 0) {
+    return 0;
+  }
+
+  if (leftParts.length === 0) {
+    return -1;
+  }
+
+  if (rightParts.length === 0) {
+    return 1;
+  }
+
+  const maxLength = Math.max(leftParts.length, rightParts.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftPart = leftParts[index] || 0;
+    const rightPart = rightParts[index] || 0;
+
+    if (leftPart > rightPart) {
+      return 1;
+    }
+
+    if (leftPart < rightPart) {
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
+async function checkForAppUpdate() {
+  const response = await fetch(APP_UPDATE_API_LATEST_URL, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'AeroSync-Addon-Updater'
+    }
+  });
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error('GitHub API rate limit reached. Please try again later.');
+    }
+
+    if (response.status === 404) {
+      throw new Error('No published release found yet.');
+    }
+
+    throw new Error(`App update check failed (HTTP ${response.status}).`);
+  }
+
+  const release = await response.json();
+  const latestVersion = String(release.tag_name || release.name || '').trim();
+
+  if (!latestVersion) {
+    throw new Error('Invalid release metadata: version tag is missing.');
+  }
+
+  const currentVersion = String(app.getVersion() || '').trim();
+
+  return {
+    status: compareVersionTags(latestVersion, currentVersion) > 0 ? 'available' : 'up-to-date',
+    currentVersion,
+    latestVersion,
+    releaseName: String(release.name || latestVersion).trim(),
+    releaseUrl: String(release.html_url || APP_UPDATE_RELEASES_URL).trim(),
+    publishedAt: release.published_at || null
+  };
+}
 
 function resolveLanguageDirectory(langDirFromEnv) {
   if (langDirFromEnv) {
@@ -177,6 +270,26 @@ function registerIpcHandlers() {
 
   ipcMain.handle('i18n:load', async (_event, request = {}) => {
     return languageStore.loadLanguage(request.code);
+  });
+
+  ipcMain.handle('app:get-version', async () => {
+    return app.getVersion();
+  });
+
+  ipcMain.handle('app:update-check', async () => {
+    return checkForAppUpdate();
+  });
+
+  ipcMain.handle('app:open-external', async (_event, request = {}) => {
+    const payload = assertObject('app:open-external', request);
+    const targetUrl = String(payload.url || APP_UPDATE_RELEASES_URL).trim();
+
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      throw new Error('Invalid external URL.');
+    }
+
+    await shell.openExternal(targetUrl);
+    return { opened: true };
   });
 
   ipcMain.handle('updates:check', async (_event, request) => {

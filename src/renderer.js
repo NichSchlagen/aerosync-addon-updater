@@ -8,6 +8,7 @@ const state = {
   checkRunning: false,
   installRunning: false,
   installPaused: false,
+  appUpdateRunning: false,
   i18n: {
     locale: 'en',
     localeTag: 'en-US',
@@ -22,6 +23,7 @@ const el = {
   profileList: document.getElementById('profileList'),
   selectedProfileName: document.getElementById('selectedProfileName'),
   languageSelect: document.getElementById('languageSelect'),
+  appVersionChip: document.getElementById('appVersionChip'),
 
   profileName: document.getElementById('profileName'),
   host: document.getElementById('host'),
@@ -37,6 +39,7 @@ const el = {
 
   btnNewProfile: document.getElementById('btnNewProfile'),
   btnDeleteProfile: document.getElementById('btnDeleteProfile'),
+  btnCheckAppUpdate: document.getElementById('btnCheckAppUpdate'),
   btnSaveProfile: document.getElementById('btnSaveProfile'),
   btnPickDir: document.getElementById('btnPickDir'),
   btnCheck: document.getElementById('btnCheck'),
@@ -69,6 +72,15 @@ function t(key, vars = {}) {
   return Object.entries(vars).reduce((acc, [name, value]) => {
     return acc.replaceAll(`{${name}}`, String(value));
   }, raw);
+}
+
+function formatVersionLabel(version) {
+  const raw = String(version || '').trim();
+  if (!raw) {
+    return 'v?';
+  }
+
+  return /^v/i.test(raw) ? raw : `v${raw}`;
 }
 
 function formatBytes(bytes) {
@@ -274,6 +286,10 @@ function setStatus(text) {
   el.runStatus.textContent = text;
 }
 
+function setAppVersion(version) {
+  el.appVersionChip.textContent = formatVersionLabel(version);
+}
+
 function resetProgressUi() {
   el.progressLabel.textContent = t('progress.ready');
   el.progressPercent.textContent = '0%';
@@ -303,6 +319,7 @@ function syncActionButtons() {
   el.btnInstall.disabled = state.checkRunning || state.installRunning || !hasPlanActions;
   el.btnPause.disabled = !state.installRunning;
   el.btnCancel.disabled = !state.installRunning;
+  el.btnCheckAppUpdate.disabled = state.installRunning || state.checkRunning || state.appUpdateRunning;
   el.btnNewProfile.disabled = lockProfileUi;
   el.btnSaveProfile.disabled = lockProfileUi;
   el.btnDeleteProfile.disabled = lockProfileUi;
@@ -734,6 +751,53 @@ async function onTogglePauseInstall() {
   }
 }
 
+async function onCheckAppUpdate() {
+  if (state.appUpdateRunning) {
+    return;
+  }
+
+  try {
+    state.appUpdateRunning = true;
+    syncActionButtons();
+    setStatus(t('status.appUpdateChecking'));
+    log(t('log.appUpdateChecking'));
+
+    const result = await window.aeroApi.checkAppUpdate();
+    setAppVersion(result.currentVersion);
+
+    if (result.status === 'available') {
+      setStatus(t('status.appUpdateAvailable'));
+      log(t('log.appUpdateAvailable', {
+        latest: result.latestVersion,
+        current: result.currentVersion
+      }));
+
+      const openRelease = window.confirm(t('confirm.openReleasePage', {
+        latest: result.latestVersion,
+        current: result.currentVersion
+      }));
+
+      if (openRelease) {
+        await window.aeroApi.openExternalUrl(result.releaseUrl);
+      }
+
+      return;
+    }
+
+    setStatus(t('status.appUpToDate'));
+    log(t('log.appUpToDate', {
+      current: result.currentVersion
+    }));
+  } catch (error) {
+    setStatus(t('status.appUpdateError'));
+    log(t('log.appUpdateError', { message: error.message }));
+    window.alert(t('alert.appUpdateFailed', { message: error.message }));
+  } finally {
+    state.appUpdateRunning = false;
+    syncActionButtons();
+  }
+}
+
 async function onCancelInstall() {
   if (!state.installRunning) {
     return;
@@ -828,6 +892,7 @@ function wireEvents() {
     }
   });
 
+  el.btnCheckAppUpdate.addEventListener('click', onCheckAppUpdate);
   el.btnCheck.addEventListener('click', onCheckUpdates);
   el.btnInstall.addEventListener('click', onInstallUpdates);
   el.btnPause.addEventListener('click', onTogglePauseInstall);
@@ -856,6 +921,13 @@ async function init() {
     const message = String(error && error.message ? error.message : error);
     window.alert(`i18n init failed:\n${message}`);
   }
+  try {
+    const appVersion = await window.aeroApi.getAppVersion();
+    setAppVersion(appVersion);
+  } catch {
+    setAppVersion('');
+  }
+
   await loadProfiles();
   renderActions([]);
   resetSummary();
