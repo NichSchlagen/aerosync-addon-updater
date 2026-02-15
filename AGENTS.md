@@ -1,0 +1,133 @@
+# AGENTS.md
+
+## Purpose and Scope
+These instructions apply to the entire `aerosync-addon-updater` repository.
+The goal is to keep agent work safe, consistent, and free of functional regressions.
+
+## Project Overview (Short)
+- Electron desktop app for updating X-Plane add-ons through the X-Updater service.
+- Multi-profile management (each profile has its own product directory, channel, snapshot baseline, ignore list, and credentials).
+- Core flow:
+  - Create update plan (`updates:check`)
+  - Cache plan in memory
+  - Install plan (`updates:install`) with checksum validation and optional gunzip fallback
+
+## Tech Stack and Runtime
+- Language: JavaScript (CommonJS), no TypeScript.
+- Runtime: Node.js 20+, Electron 40.
+- Build: `electron-builder`.
+- No automated test suite currently exists in this repository.
+
+## Important Directories and Files
+- `main.js`: main process, IPC handlers, native menu state, app-update check.
+- `preload.js`: secure bridge (`window.aeroApi`) between renderer and main.
+- `src/renderer.js`: complete UI state, user flows, i18n application, check/install logic.
+- `src/index.html`, `src/styles.css`: UI structure and styling.
+- `lib/update-client.js`: update engine (auth, product/snapshot selection, plan creation, install, checksums).
+- `lib/profile-store.js`: profile persistence, optional encrypted credentials.
+- `lib/language-store.js`: external language loading and validation.
+- `languages/en.json`, `languages/de.json`: UI strings.
+- `.github/workflows/build-packages.yml`: release builds and artifact upload.
+- `docs/`: end-user and contributor documentation.
+
+## Architecture Invariants (Do Not Break)
+1. `fresh` and `repair` are mutually exclusive.
+2. In `repair`, `since` must always be `0` and `fresh` must be `false`.
+3. An install plan is bound to `profileId`; installing with a different profile must fail.
+4. Only one active installation is allowed at a time (`activeInstall` in `main.js`).
+5. Pause/resume/cancel must only work for the same IPC sender that started the install.
+6. All server file paths must be normalized and checked for traversal (`normalizeRelPath` and root boundary checks).
+7. Installation order must remain: all `delete` actions first, then all `update` actions.
+8. File integrity is MD5-based; on raw mismatch, gunzip hash fallback is required.
+9. Optional packages without detection markers must be skipped with a warning, not treated as hard errors.
+10. `rememberAuth = false` must never persist credentials to `profiles.json`.
+11. If `safeStorage` is unavailable, the app must remain functional (with warning behavior).
+12. Language loading must merge with a fallback language (prefer `en`) so missing keys do not break the UI.
+13. Main-process menu state must stay synchronized with renderer state (`menu:update-state`).
+
+## Security and Privacy Rules
+- Never log credentials.
+- Do not add IPC endpoints without input validation (follow `assertObject`, `assertNonEmptyString` patterns).
+- Only open external URLs after `http/https` validation.
+- Never use unvalidated server paths for file operations.
+- Do not bypass existing checksum verification logic.
+
+## Change Rules by Area
+
+### Profile and Persistence Changes
+- Keep updates consistent across:
+  - `lib/profile-store.js` (normalization, save behavior, public profile shape)
+  - `src/renderer.js` (`collectProfileFromForm`, `fillForm`, dirty-check logic)
+  - `src/index.html` (form fields)
+  - `languages/*.json` (labels, placeholders, alerts)
+  - `docs/user-guide.md` and, when relevant, `docs/data-and-security.md`
+- Preserve backward compatibility for stored `profiles.json` where possible.
+
+### IPC or Main/Renderer Contract Changes
+- Always update all three layers:
+  - `main.js` (handler)
+  - `preload.js` (bridge function)
+  - `src/renderer.js` (call site and error handling)
+- For new runtime states, verify `syncActionButtons()` and menu enable/disable behavior.
+
+### Update Engine Changes
+- Be extra careful in `lib/update-client.js`:
+  - Do not accidentally narrow auth strategy and retry behavior.
+  - Avoid regressions in detection logic or `since` handling.
+  - Ignore filtering may remove actions only; it must not corrupt plan summary semantics.
+  - Install cancel/pause must remain responsive.
+- Any behavior change must be reflected in `docs/update-engine.md`.
+
+### i18n Changes
+- Add new UI strings to both `languages/en.json` and `languages/de.json`.
+- Renderer uses `t(key, vars)`: do not introduce hardcoded user-facing strings in new UI/alerts/logs.
+- For new tooltip/placeholder text, wire correct `data-i18n-*` attributes.
+
+### UI Changes
+- Keep existing class structure and responsive breakpoints unless you are intentionally redesigning.
+- The file table must stay capped at 600 rendered rows for performance.
+- For new controls, verify disabled behavior during running check/install operations.
+
+## Validation Before Completion (Required Checklist)
+1. Validate JSON files:
+   - `languages/en.json`
+   - `languages/de.json`
+2. Confirm basic runtime flow without build/runtime errors:
+   - app starts (`npm start` or `npm run start:linux`).
+3. Manual smoke checks (minimum):
+   - save/load/delete profiles.
+   - run check flow with a valid profile.
+   - start install and test pause/resume/cancel.
+   - switch language and verify persistence (`aerosync.language`).
+4. Additional checks for engine changes:
+   - verify `fresh` vs `repair` behavior.
+   - verify ignore list matching (exact path, prefix, wildcard, basename rule).
+   - verify snapshot update after successful install.
+5. For build/release changes:
+   - cross-check `.github/workflows/build-packages.yml` with `package.json` build targets.
+
+If any check cannot be run locally, explicitly state that in the final report.
+
+## Build and Release Notes
+- Local builds:
+  - `npm run build:appimage`
+  - `npm run build:deb`
+  - `npm run build:rpm`
+  - `npm run build:win:setup`
+  - `npm run build:win:portable`
+- CI release is triggered by pushing a tag.
+- Uploaded assets: `*.AppImage`, `*.deb`, `*.rpm`, `*-setup.exe`, `*-portable.exe`.
+- `.blockmap` files are intentionally not published as release assets.
+
+## Documentation Requirement
+When behavior changes, update matching docs:
+- User flow: `docs/user-guide.md`
+- Engine internals: `docs/update-engine.md`
+- Storage/security: `docs/data-and-security.md`
+- Operational issues: `docs/troubleshooting.md`
+
+## Non-Goals / Avoid
+- Do not add unnecessary runtime dependencies.
+- Do not introduce silent API contract breaks between main/preload/renderer.
+- Do not weaken path or checksum validation.
+- Do not leave i18n keys half-updated across `en` and `de`.
