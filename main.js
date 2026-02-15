@@ -1,6 +1,6 @@
 const path = require('node:path');
 const fs = require('node:fs');
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = require('electron');
 
 const { ProfileStore } = require('./lib/profile-store');
 const { LanguageStore } = require('./lib/language-store');
@@ -12,6 +12,28 @@ let languageStore;
 let updaterClient;
 let activeInstall = null;
 
+const MENU_ACTIONS = Object.freeze({
+  PROFILE_NEW: 'profile:new',
+  PROFILE_SAVE: 'profile:save',
+  PROFILE_DELETE: 'profile:delete',
+  PROFILE_OPEN_DIR: 'profile:open-dir',
+  UPDATES_CHECK: 'updates:check',
+  UPDATES_INSTALL: 'updates:install',
+  UPDATES_PAUSE_RESUME: 'updates:pause-resume',
+  UPDATES_CANCEL: 'updates:cancel',
+  APP_CHECK_UPDATE: 'app:check-update',
+  LOG_CLEAR: 'log:clear'
+});
+
+const menuState = {
+  hasProfile: false,
+  hasPlan: false,
+  checkRunning: false,
+  installRunning: false,
+  installPaused: false,
+  appUpdateRunning: false
+};
+
 const APP_UPDATE_REPO = {
   owner: 'NichSchlagen',
   repo: 'aerosync-addon-updater'
@@ -19,6 +41,7 @@ const APP_UPDATE_REPO = {
 
 const APP_UPDATE_RELEASES_URL = `https://github.com/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases`;
 const APP_UPDATE_API_LATEST_URL = `https://api.github.com/repos/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases/latest`;
+const APP_DOCS_URL = `https://github.com/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/blob/main/docs/user-guide.md`;
 
 function normalizeVersionParts(rawVersion) {
   const match = String(rawVersion || '').trim().match(/^v?(\d+(?:\.\d+)*)/i);
@@ -105,6 +128,210 @@ async function checkForAppUpdate() {
   };
 }
 
+function dispatchMenuAction(action) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.webContents.send('menu:action', { action });
+}
+
+function updateMenuItem(menu, id, updates) {
+  const item = menu.getMenuItemById(id);
+  if (!item) {
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'enabled')) {
+    item.enabled = Boolean(updates.enabled);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updates, 'label')) {
+    item.label = String(updates.label);
+  }
+}
+
+function applyMenuState() {
+  const menu = Menu.getApplicationMenu();
+  if (!menu) {
+    return;
+  }
+
+  const lockProfile = menuState.checkRunning || menuState.installRunning;
+  const checkEnabled = !menuState.checkRunning && !menuState.installRunning;
+  const updatesCheckEnabled = checkEnabled && menuState.hasProfile;
+  const appUpdateEnabled = checkEnabled && !menuState.appUpdateRunning;
+
+  updateMenuItem(menu, 'file.newProfile', { enabled: !lockProfile });
+  updateMenuItem(menu, 'file.saveProfile', { enabled: !lockProfile });
+  updateMenuItem(menu, 'file.deleteProfile', { enabled: menuState.hasProfile && !lockProfile });
+  updateMenuItem(menu, 'file.openProductDir', { enabled: menuState.hasProfile && !lockProfile });
+
+  updateMenuItem(menu, 'action.checkUpdates', { enabled: updatesCheckEnabled });
+  updateMenuItem(menu, 'action.installUpdates', { enabled: checkEnabled && menuState.hasPlan });
+  updateMenuItem(menu, 'action.pauseResume', {
+    enabled: menuState.installRunning,
+    label: menuState.installPaused ? 'Resume Installation' : 'Pause Installation'
+  });
+  updateMenuItem(menu, 'action.cancelInstall', { enabled: menuState.installRunning });
+  updateMenuItem(menu, 'action.checkAppUpdate', { enabled: appUpdateEnabled });
+  updateMenuItem(menu, 'help.checkAppUpdate', { enabled: appUpdateEnabled });
+}
+
+function updateMenuState(nextState = {}) {
+  if (!nextState || typeof nextState !== 'object') {
+    return;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'hasProfile')) {
+    menuState.hasProfile = Boolean(nextState.hasProfile);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'hasPlan')) {
+    menuState.hasPlan = Boolean(nextState.hasPlan);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'checkRunning')) {
+    menuState.checkRunning = Boolean(nextState.checkRunning);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'installRunning')) {
+    menuState.installRunning = Boolean(nextState.installRunning);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'installPaused')) {
+    menuState.installPaused = Boolean(nextState.installPaused);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'appUpdateRunning')) {
+    menuState.appUpdateRunning = Boolean(nextState.appUpdateRunning);
+  }
+
+  applyMenuState();
+}
+
+function buildApplicationMenu() {
+  const template = [
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
+    {
+      label: 'File',
+      submenu: [
+        {
+          id: 'file.newProfile',
+          label: 'New Profile',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_NEW)
+        },
+        {
+          id: 'file.saveProfile',
+          label: 'Save Profile',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_SAVE)
+        },
+        {
+          id: 'file.deleteProfile',
+          label: 'Delete Profile',
+          accelerator: 'CmdOrCtrl+Backspace',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_DELETE)
+        },
+        { type: 'separator' },
+        {
+          id: 'file.openProductDir',
+          label: 'Open Aircraft Folder',
+          accelerator: 'CmdOrCtrl+O',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_OPEN_DIR)
+        },
+        { type: 'separator' },
+        process.platform === 'darwin' ? { role: 'close' } : { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Actions',
+      submenu: [
+        {
+          id: 'action.checkUpdates',
+          label: 'Check Updates',
+          accelerator: 'F5',
+          click: () => dispatchMenuAction(MENU_ACTIONS.UPDATES_CHECK)
+        },
+        {
+          id: 'action.installUpdates',
+          label: 'Install Updates',
+          accelerator: 'CmdOrCtrl+I',
+          click: () => dispatchMenuAction(MENU_ACTIONS.UPDATES_INSTALL)
+        },
+        {
+          id: 'action.pauseResume',
+          label: 'Pause Installation',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => dispatchMenuAction(MENU_ACTIONS.UPDATES_PAUSE_RESUME)
+        },
+        {
+          id: 'action.cancelInstall',
+          label: 'Cancel Installation',
+          accelerator: 'Esc',
+          click: () => dispatchMenuAction(MENU_ACTIONS.UPDATES_CANCEL)
+        },
+        { type: 'separator' },
+        {
+          id: 'action.checkAppUpdate',
+          label: 'Check App Update',
+          accelerator: 'CmdOrCtrl+U',
+          click: () => dispatchMenuAction(MENU_ACTIONS.APP_CHECK_UPDATE)
+        }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          id: 'view.clearLog',
+          label: 'Clear Log',
+          accelerator: 'CmdOrCtrl+L',
+          click: () => dispatchMenuAction(MENU_ACTIONS.LOG_CLEAR)
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'User Guide',
+          click: () => {
+            void shell.openExternal(APP_DOCS_URL);
+          }
+        },
+        {
+          label: 'GitHub Releases',
+          click: () => {
+            void shell.openExternal(APP_UPDATE_RELEASES_URL);
+          }
+        },
+        { type: 'separator' },
+        {
+          id: 'help.checkAppUpdate',
+          label: 'Check App Update',
+          click: () => dispatchMenuAction(MENU_ACTIONS.APP_CHECK_UPDATE)
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+  applyMenuState();
+}
+
 function resolveLanguageDirectory(langDirFromEnv) {
   if (langDirFromEnv) {
     return path.resolve(langDirFromEnv);
@@ -160,6 +387,10 @@ function createMainWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src/index.html'));
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 function registerIpcHandlers() {
@@ -290,6 +521,24 @@ function registerIpcHandlers() {
 
     await shell.openExternal(targetUrl);
     return { opened: true };
+  });
+
+  ipcMain.handle('app:open-path', async (_event, request = {}) => {
+    const payload = assertObject('app:open-path', request);
+    const targetPath = assertNonEmptyString('path', payload.path);
+
+    const errorText = await shell.openPath(targetPath);
+    if (errorText) {
+      throw new Error(errorText);
+    }
+
+    return { opened: true };
+  });
+
+  ipcMain.handle('menu:update-state', async (_event, request = {}) => {
+    const payload = assertObject('menu:update-state', request);
+    updateMenuState(payload);
+    return { ok: true };
   });
 
   ipcMain.handle('updates:check', async (_event, request) => {
@@ -427,6 +676,7 @@ app.whenReady().then(() => {
 
   registerIpcHandlers();
   createMainWindow();
+  buildApplicationMenu();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
