@@ -18,8 +18,8 @@
     "pack": "electron-builder --dir",
     "build:appimage": "electron-builder --linux AppImage",
     "build:win": "npm run build:win:setup && npm run build:win:portable",
-    "build:win:setup": "electron-builder --win nsis --config.artifactName=\"${productName}-${version}-${arch}-setup.${ext}\"",
-    "build:win:portable": "electron-builder --win portable --config.artifactName=\"${productName}-${version}-${arch}-portable.${ext}\"",
+    "build:win:setup": "electron-builder --win nsis",
+    "build:win:portable": "electron-builder --win portable",
     "build:deb": "electron-builder --linux deb",
     "build:rpm": "electron-builder --linux rpm",
     "build:linux": "npm run build:appimage && npm run build:deb && npm run build:rpm"
@@ -71,6 +71,12 @@
         "portable"
       ],
       "icon": "build/icons/icon.ico"
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-${arch}-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
     }
   }
 }
