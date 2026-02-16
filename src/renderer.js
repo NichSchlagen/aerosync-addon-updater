@@ -1,5 +1,7 @@
 const DEFAULT_HOST = 'https://update.x-plane.org';
 const LANGUAGE_STORAGE_KEY = 'aerosync.language';
+const ACTION_TABLE_MAX_ROWS = 600;
+const ACTION_TABLE_PAGE_SIZES = [50, 100, 200, 300, 600];
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -21,6 +23,12 @@ const state = {
   selectedProfileId: null,
   currentPlan: null,
   optionalPackageSelection: {},
+  actionTable: {
+    query: '',
+    action: 'all',
+    page: 1,
+    pageSize: 100
+  },
   checkRunning: false,
   installRunning: false,
   installPaused: false,
@@ -75,6 +83,12 @@ const el = {
   optionalPackagesEmpty: document.getElementById('optionalPackagesEmpty'),
   optionalPackagesList: document.getElementById('optionalPackagesList'),
   actionCount: document.getElementById('actionCount'),
+  planSearch: document.getElementById('planSearch'),
+  planActionFilter: document.getElementById('planActionFilter'),
+  planPageSize: document.getElementById('planPageSize'),
+  btnPlanPrev: document.getElementById('btnPlanPrev'),
+  btnPlanNext: document.getElementById('btnPlanNext'),
+  planPageInfo: document.getElementById('planPageInfo'),
   progressLabel: document.getElementById('progressLabel'),
   progressPercent: document.getElementById('progressPercent'),
   progressMeta: document.getElementById('progressMeta'),
@@ -160,6 +174,89 @@ function normalizeOptionalPackageAction(value, fallback = 'ignore') {
   }
 
   return fallback;
+}
+
+function normalizeActionTableFilter(value, fallback = 'all') {
+  const action = String(value || '').trim().toLowerCase();
+  if (action === 'all' || action === 'update' || action === 'delete') {
+    return action;
+  }
+
+  return fallback;
+}
+
+function normalizeActionTablePageSize(value, fallback = 100) {
+  const parsed = Math.trunc(Number(value));
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  if (!ACTION_TABLE_PAGE_SIZES.includes(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(parsed, ACTION_TABLE_MAX_ROWS);
+}
+
+function getFilteredActions(actions) {
+  const list = Array.isArray(actions) ? actions : [];
+  const query = String(state.actionTable.query || '').trim().toLowerCase();
+  const actionFilter = normalizeActionTableFilter(state.actionTable.action, 'all');
+
+  return list.filter((item) => {
+    const type = String(item && item.type ? item.type : '').toLowerCase();
+    if (actionFilter !== 'all' && type !== actionFilter) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const packageName = String(item && item.packageName ? item.packageName : '').toLowerCase();
+    const relativePath = String(item && item.relativePath ? item.relativePath : '').toLowerCase();
+    return packageName.includes(query) || relativePath.includes(query);
+  });
+}
+
+function syncActionTableControls(totalCount, filteredCount, totalPages) {
+  const hasActions = totalCount > 0;
+  const hasFilteredActions = filteredCount > 0;
+  const page = Number(state.actionTable.page || 1);
+
+  if (el.planSearch.value !== state.actionTable.query) {
+    el.planSearch.value = state.actionTable.query;
+  }
+
+  if (el.planActionFilter.value !== state.actionTable.action) {
+    el.planActionFilter.value = state.actionTable.action;
+  }
+
+  if (el.planPageSize.value !== String(state.actionTable.pageSize)) {
+    el.planPageSize.value = String(state.actionTable.pageSize);
+  }
+
+  el.planSearch.disabled = !hasActions;
+  el.planActionFilter.disabled = !hasActions;
+  el.planPageSize.disabled = !hasActions;
+  el.btnPlanPrev.disabled = !hasFilteredActions || page <= 1;
+  el.btnPlanNext.disabled = !hasFilteredActions || page >= totalPages;
+
+  if (!hasActions) {
+    el.planPageInfo.textContent = t('table.pageInfoEmpty');
+    return;
+  }
+
+  if (!hasFilteredActions) {
+    el.planPageInfo.textContent = t('table.pageInfoNoMatch', { total: totalCount });
+    return;
+  }
+
+  el.planPageInfo.textContent = t('table.pageInfo', {
+    page,
+    totalPages,
+    count: filteredCount
+  });
 }
 
 function syncOptionalSelectionFromPlan(optionalPackages) {
@@ -542,14 +639,38 @@ function renderOptionalPackages(optionalPackages) {
 }
 
 function renderActions(actions) {
-  if (!Array.isArray(actions) || actions.length === 0) {
+  const allActions = Array.isArray(actions) ? actions : [];
+  const totalCount = allActions.length;
+
+  state.actionTable.action = normalizeActionTableFilter(state.actionTable.action, 'all');
+  state.actionTable.pageSize = normalizeActionTablePageSize(
+    state.actionTable.pageSize,
+    normalizeActionTablePageSize(el.planPageSize.value, 100)
+  );
+
+  const filteredActions = getFilteredActions(allActions);
+  const filteredCount = filteredActions.length;
+
+  if (totalCount === 0) {
+    syncActionTableControls(0, 0, 1);
     el.actionsTableBody.innerHTML = `<tr><td colspan="4" class="empty">${escapeHtml(t('table.noUpdates'))}</td></tr>`;
     el.actionCount.textContent = t('count.entries', { count: 0 });
     return;
   }
 
-  const maxRows = 600;
-  const shown = actions.slice(0, maxRows);
+  if (filteredCount === 0) {
+    state.actionTable.page = 1;
+    syncActionTableControls(totalCount, 0, 1);
+    el.actionsTableBody.innerHTML = `<tr><td colspan="4" class="empty">${escapeHtml(t('table.noFilterMatch'))}</td></tr>`;
+    el.actionCount.textContent = t('count.entriesFiltered', { filtered: 0, total: totalCount });
+    return;
+  }
+
+  const totalPages = Math.max(1, Math.ceil(filteredCount / state.actionTable.pageSize));
+  const currentPage = Math.min(Math.max(1, Math.trunc(Number(state.actionTable.page || 1))), totalPages);
+  state.actionTable.page = currentPage;
+  const startIndex = (currentPage - 1) * state.actionTable.pageSize;
+  const shown = filteredActions.slice(startIndex, startIndex + state.actionTable.pageSize);
 
   const rows = shown
     .map((item) => {
@@ -576,12 +697,11 @@ function renderActions(actions) {
     })
     .join('');
 
-  const clippedHint = actions.length > maxRows
-    ? `<tr><td colspan="4" class="empty">${escapeHtml(t('table.moreHidden', { count: actions.length - maxRows }))}</td></tr>`
-    : '';
-
-  el.actionsTableBody.innerHTML = rows + clippedHint;
-  el.actionCount.textContent = t('count.entries', { count: actions.length });
+  el.actionsTableBody.innerHTML = rows;
+  syncActionTableControls(totalCount, filteredCount, totalPages);
+  el.actionCount.textContent = filteredCount === totalCount
+    ? t('count.entries', { count: totalCount })
+    : t('count.entriesFiltered', { filtered: filteredCount, total: totalCount });
 }
 
 function renderProfiles() {
@@ -774,6 +894,7 @@ async function onCheckUpdates() {
       actions: planResult.actions,
       optionalPackages
     };
+    state.actionTable.page = 1;
 
     applyPlanToUi(planResult);
     resetProgressUi();
@@ -1128,6 +1249,37 @@ async function onCancelInstall() {
   }
 }
 
+function onPlanSearchChanged() {
+  state.actionTable.query = String(el.planSearch.value || '').trim();
+  state.actionTable.page = 1;
+  renderActions(state.currentPlan?.actions || []);
+}
+
+function onPlanActionFilterChanged() {
+  state.actionTable.action = normalizeActionTableFilter(el.planActionFilter.value, 'all');
+  state.actionTable.page = 1;
+  renderActions(state.currentPlan?.actions || []);
+}
+
+function onPlanPageSizeChanged() {
+  state.actionTable.pageSize = normalizeActionTablePageSize(
+    el.planPageSize.value,
+    state.actionTable.pageSize
+  );
+  state.actionTable.page = 1;
+  renderActions(state.currentPlan?.actions || []);
+}
+
+function onPlanPrevPage() {
+  state.actionTable.page = Math.max(1, Number(state.actionTable.page || 1) - 1);
+  renderActions(state.currentPlan?.actions || []);
+}
+
+function onPlanNextPage() {
+  state.actionTable.page = Number(state.actionTable.page || 1) + 1;
+  renderActions(state.currentPlan?.actions || []);
+}
+
 async function onOptionalPackageSelectionChanged(event) {
   const target = event && event.target;
   if (!target || target.tagName !== 'SELECT') {
@@ -1196,6 +1348,11 @@ function wireEvents() {
   el.btnCancel.addEventListener('click', () => {
     void onCancelInstall();
   });
+  el.planSearch.addEventListener('input', onPlanSearchChanged);
+  el.planActionFilter.addEventListener('change', onPlanActionFilterChanged);
+  el.planPageSize.addEventListener('change', onPlanPageSizeChanged);
+  el.btnPlanPrev.addEventListener('click', onPlanPrevPage);
+  el.btnPlanNext.addEventListener('click', onPlanNextPage);
   el.optFresh.addEventListener('change', onToggleFreshMode);
   el.optRepair.addEventListener('change', onToggleRepairMode);
   el.btnClearLog.addEventListener('click', onClearLog);

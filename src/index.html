@@ -166,6 +166,42 @@ objects/custom.obj"></textarea>
               <h3 class="panel-title" data-i18n="panel.filePlan">Planned File Plan</h3>
               <span id="actionCount" class="chip">0 entries</span>
             </div>
+            <div class="plan-tools">
+              <div class="plan-filters">
+                <label class="plan-filter">
+                  <span data-i18n="table.searchLabel">Search</span>
+                  <input
+                    id="planSearch"
+                    type="text"
+                    data-i18n-placeholder="placeholder.planSearch"
+                    placeholder="Search package or file path"
+                  />
+                </label>
+                <label class="plan-filter">
+                  <span data-i18n="table.filterAction">Action</span>
+                  <select id="planActionFilter">
+                    <option value="all" data-i18n="table.filterAll">All</option>
+                    <option value="update" data-i18n="table.filterUpdate">Update</option>
+                    <option value="delete" data-i18n="table.filterDelete">Delete</option>
+                  </select>
+                </label>
+                <label class="plan-filter plan-filter-size">
+                  <span data-i18n="table.pageSize">Rows per page</span>
+                  <select id="planPageSize">
+                    <option value="50">50</option>
+                    <option value="100" selected>100</option>
+                    <option value="200">200</option>
+                    <option value="300">300</option>
+                    <option value="600">600</option>
+                  </select>
+                </label>
+              </div>
+              <div class="plan-pagination">
+                <button id="btnPlanPrev" class="btn btn-ghost" type="button" data-i18n="btn.prevPage">Previous</button>
+                <span id="planPageInfo" class="plan-page-info">Page 1 / 1</span>
+                <button id="btnPlanNext" class="btn btn-ghost" type="button" data-i18n="btn.nextPage">Next</button>
+              </div>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
