@@ -107,16 +107,21 @@ Actions:
 Symptoms:
 
 - summary/counter shows many actions
-- table shows fewer rows than expected
+- table page shows fewer rows than expected
 
 Cause:
 
-- UI renders up to 600 rows for performance
+- active search/filter hides entries
+- selected page size limits rows shown per page
+- UI renders at most 600 rows per page for performance
 
 Actions:
 
-1. rely on summary and action counter for total size/count
-2. install is still processed against full internal plan
+1. clear search text and set action filter to `All`
+2. increase `Rows per page` if needed
+3. switch page using previous/next controls
+4. rely on summary and action counter for full totals
+5. install is still processed against full internal plan
 
 ## Alpha/Beta Not Available
 

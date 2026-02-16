@@ -590,6 +590,50 @@ textarea:focus {
   font-size: 0.8rem;
 }
 
+.plan-tools {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.plan-filters {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(260px, 1fr) minmax(170px, 220px) minmax(130px, 170px);
+}
+
+.plan-filter {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-light);
+}
+
+.plan-filter input,
+.plan-filter select {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.plan-filter-size select {
+  min-width: 0;
+}
+
+.plan-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.plan-page-info {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  min-width: 170px;
+  text-align: center;
+}
+
 .table-wrap {
   width: 100%;
   max-width: 100%;
@@ -796,6 +840,14 @@ td.empty {
   .summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .plan-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-filter-size {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 980px) {
@@ -838,5 +890,22 @@ td.empty {
 
   .optional-package-choice {
     justify-content: space-between;
+  }
+
+  .plan-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-filter-size {
+    grid-column: auto;
+  }
+
+  .plan-pagination {
+    justify-content: space-between;
+  }
+
+  .plan-page-info {
+    min-width: 0;
+    flex: 1;
   }
 }

@@ -121,9 +121,10 @@ The checker does not auto-download or auto-install app updates.
 
 ## Planned File Plan Table
 
-- For performance, the table renders up to 600 action rows.
-- The counter still shows the full action count.
-- If more rows exist, the last row shows how many entries are hidden.
+- The table supports text search (package name and file path), action filter (`All` / `Update` / `Delete`), and page size selection.
+- Results are paginated with previous/next navigation.
+- For performance, each page renders at most 600 rows.
+- The entry counter shows either total entries or filtered/total entries when filters are active.
 
 ## Ignore List
 
