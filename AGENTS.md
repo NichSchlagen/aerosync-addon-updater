@@ -1,8 +1,8 @@
 # AGENTS.md
 
 ## Purpose and Scope
-These instructions apply to the entire `aerosync-addon-updater` repository.
-The goal is to keep agent work safe, consistent, and free of functional regressions.
+These instructions apply to coding agents working in the `aerosync-addon-updater` repository.
+The goal is to keep coding-agent changes safe, consistent, and free of functional regressions.
 
 ## Project Overview (Short)
 - Electron desktop app for updating X-Plane add-ons through the X-Updater service.
@@ -17,6 +17,12 @@ The goal is to keep agent work safe, consistent, and free of functional regressi
 - Runtime: Node.js 20+, Electron 40.
 - Build: `electron-builder`.
 - No automated test suite currently exists in this repository.
+
+## Coding-Agent Reality
+- Coding agents can run command-line checks and static validation.
+- Coding agents usually cannot perform trustworthy interactive desktop UI smoke tests.
+- Never claim manual UI checks were executed unless explicitly confirmed by a human.
+- If a manual check is required, mark it as `not run` and state why.
 
 ## Important Directories and Files
 - `main.js`: main process, IPC handlers, native menu state, app-update check.
@@ -92,9 +98,9 @@ The goal is to keep agent work safe, consistent, and free of functional regressi
 1. Validate JSON files:
    - `languages/en.json`
    - `languages/de.json`
-2. Confirm basic runtime flow without build/runtime errors:
-   - app starts (`npm start` or `npm run start:linux`).
-3. Manual smoke checks (minimum):
+2. Confirm basic runtime flow without build/runtime errors (best effort):
+   - app starts (`npm start` or `npm run start:linux`), if environment permits.
+3. Manual smoke checks (minimum, maintainer-run):
    - save/load/delete profiles.
    - run check flow with a valid profile.
    - start install and test pause/resume/cancel.
@@ -106,7 +112,7 @@ The goal is to keep agent work safe, consistent, and free of functional regressi
 5. For build/release changes:
    - cross-check `.github/workflows/build-packages.yml` with `package.json` build targets.
 
-If any check cannot be run locally, explicitly state that in the final report.
+If any check cannot be run locally (including manual smoke checks), explicitly state that in the final report.
 
 ## Build and Release Notes
 - Local builds:
