@@ -159,6 +159,7 @@ If you run into problems, please open a GitHub issue with:
 
 - the error description/message
 - the steps that trigger the issue
+- a diagnostics export file from `Actions -> Export Diagnostics...`
 
 ## Language System
 

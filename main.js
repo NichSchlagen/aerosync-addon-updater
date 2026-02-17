@@ -16,11 +16,14 @@ const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
   PROFILE_SAVE: 'profile:save',
   PROFILE_DELETE: 'profile:delete',
+  PROFILE_IMPORT: 'profile:import',
+  PROFILE_EXPORT: 'profile:export',
   PROFILE_OPEN_DIR: 'profile:open-dir',
   UPDATES_CHECK: 'updates:check',
   UPDATES_INSTALL: 'updates:install',
   UPDATES_PAUSE_RESUME: 'updates:pause-resume',
   UPDATES_CANCEL: 'updates:cancel',
+  APP_EXPORT_DIAGNOSTICS: 'app:export-diagnostics',
   APP_CHECK_UPDATE: 'app:check-update',
   LOG_CLEAR: 'log:clear'
 });
@@ -42,6 +45,143 @@ const APP_UPDATE_REPO = {
 const APP_UPDATE_RELEASES_URL = `https://github.com/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases`;
 const APP_UPDATE_API_LATEST_URL = `https://api.github.com/repos/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/releases/latest`;
 const APP_DOCS_URL = `https://github.com/${APP_UPDATE_REPO.owner}/${APP_UPDATE_REPO.repo}/blob/main/docs/user-guide.md`;
+const PROFILE_EXPORT_SCHEMA = 'aerosync.profiles.v1';
+const DIAGNOSTICS_EXPORT_SCHEMA = 'aerosync.diagnostics.v1';
+
+function fileTimestamp(now = new Date()) {
+  const year = String(now.getFullYear());
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}-${hours}${minutes}${seconds}`;
+}
+
+function resolveExportDirectory() {
+  const candidates = ['documents', 'downloads', 'desktop', 'home', 'userData'];
+  for (const key of candidates) {
+    try {
+      const value = app.getPath(key);
+      if (value) {
+        return value;
+      }
+    } catch {
+      // Ignore unsupported directory keys.
+    }
+  }
+
+  return process.cwd();
+}
+
+function normalizeProfileForExport(profile) {
+  const source = profile && typeof profile === 'object' ? profile : {};
+  return {
+    id: String(source.id || '').trim(),
+    name: String(source.name || '').trim(),
+    host: String(source.host || '').trim(),
+    productDir: String(source.productDir || '').trim(),
+    login: String(source.login || '').trim(),
+    licenseKey: String(source.licenseKey || '').trim(),
+    packageVersion: Number(source.packageVersion || 0),
+    rememberAuth: Boolean(source.rememberAuth),
+    channel: String(source.channel || 'release').trim(),
+    ignoreList: Array.isArray(source.ignoreList) ? source.ignoreList : []
+  };
+}
+
+function extractProfilesFromImportPayload(parsed) {
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return [];
+  }
+
+  if (Array.isArray(parsed.profiles)) {
+    return parsed.profiles;
+  }
+
+  return [];
+}
+
+function normalizeImportedProfile(rawProfile, index) {
+  if (!rawProfile || typeof rawProfile !== 'object') {
+    throw new Error(`Entry ${index + 1}: profile must be an object.`);
+  }
+
+  const profile = {
+    id: String(rawProfile.id || '').trim() || undefined,
+    name: String(rawProfile.name || '').trim(),
+    host: String(rawProfile.host || '').trim(),
+    productDir: String(rawProfile.productDir || '').trim(),
+    login: String(rawProfile.login || '').trim(),
+    licenseKey: String(rawProfile.licenseKey || '').trim(),
+    packageVersion: Number(rawProfile.packageVersion || 0),
+    rememberAuth: Boolean(rawProfile.rememberAuth),
+    channel: String(rawProfile.channel || '').trim(),
+    ignoreList: Array.isArray(rawProfile.ignoreList) ? rawProfile.ignoreList : []
+  };
+
+  if (!profile.name || !profile.productDir) {
+    throw new Error(`Entry ${index + 1}: missing required fields (name/productDir).`);
+  }
+
+  const warnings = [];
+  if (profile.rememberAuth && (!profile.login || !profile.licenseKey)) {
+    profile.rememberAuth = false;
+    profile.login = '';
+    profile.licenseKey = '';
+    warnings.push(`Entry ${index + 1}: rememberAuth disabled because login/license key is missing.`);
+  }
+
+  return {
+    profile,
+    warnings
+  };
+}
+
+function isSensitiveKey(rawKey) {
+  return /password|token|secret|license|login|credential|auth/i.test(String(rawKey || ''));
+}
+
+function sanitizeDiagnosticValue(value, depth = 0) {
+  if (depth > 8) {
+    return '[max-depth]';
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const valueType = typeof value;
+  if (valueType === 'string') {
+    return value.length > 20000 ? `${value.slice(0, 20000)}...[truncated]` : value;
+  }
+
+  if (valueType === 'number' || valueType === 'boolean') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const limited = value.slice(0, 200);
+    return limited.map((item) => sanitizeDiagnosticValue(item, depth + 1));
+  }
+
+  if (valueType === 'object') {
+    const out = {};
+    for (const [rawKey, rawValue] of Object.entries(value)) {
+      const key = String(rawKey || '').slice(0, 120);
+      out[key] = isSensitiveKey(key)
+        ? '[redacted]'
+        : sanitizeDiagnosticValue(rawValue, depth + 1);
+    }
+    return out;
+  }
+
+  return String(value);
+}
 
 function normalizeVersionParts(rawVersion) {
   const match = String(rawVersion || '').trim().match(/^v?(\d+(?:\.\d+)*)/i);
@@ -165,6 +305,8 @@ function applyMenuState() {
   updateMenuItem(menu, 'file.newProfile', { enabled: !lockProfile });
   updateMenuItem(menu, 'file.saveProfile', { enabled: !lockProfile });
   updateMenuItem(menu, 'file.deleteProfile', { enabled: menuState.hasProfile && !lockProfile });
+  updateMenuItem(menu, 'file.importProfiles', { enabled: !lockProfile });
+  updateMenuItem(menu, 'file.exportProfiles', { enabled: !lockProfile });
   updateMenuItem(menu, 'file.openProductDir', { enabled: menuState.hasProfile && !lockProfile });
 
   updateMenuItem(menu, 'action.checkUpdates', { enabled: updatesCheckEnabled });
@@ -174,6 +316,7 @@ function applyMenuState() {
     label: menuState.installPaused ? 'Resume Installation' : 'Pause Installation'
   });
   updateMenuItem(menu, 'action.cancelInstall', { enabled: menuState.installRunning });
+  updateMenuItem(menu, 'action.exportDiagnostics', { enabled: true });
   updateMenuItem(menu, 'action.checkAppUpdate', { enabled: appUpdateEnabled });
   updateMenuItem(menu, 'help.checkAppUpdate', { enabled: appUpdateEnabled });
 }
@@ -236,6 +379,17 @@ function buildApplicationMenu() {
         },
         { type: 'separator' },
         {
+          id: 'file.importProfiles',
+          label: 'Import Profiles...',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_IMPORT)
+        },
+        {
+          id: 'file.exportProfiles',
+          label: 'Export Profiles...',
+          click: () => dispatchMenuAction(MENU_ACTIONS.PROFILE_EXPORT)
+        },
+        { type: 'separator' },
+        {
           id: 'file.openProductDir',
           label: 'Open Aircraft Folder',
           accelerator: 'CmdOrCtrl+O',
@@ -278,6 +432,11 @@ function buildApplicationMenu() {
           label: 'Check App Update',
           accelerator: 'CmdOrCtrl+U',
           click: () => dispatchMenuAction(MENU_ACTIONS.APP_CHECK_UPDATE)
+        },
+        {
+          id: 'action.exportDiagnostics',
+          label: 'Export Diagnostics...',
+          click: () => dispatchMenuAction(MENU_ACTIONS.APP_EXPORT_DIAGNOSTICS)
         }
       ]
     },
@@ -513,6 +672,123 @@ function registerIpcHandlers() {
     return profileStore.listProfiles();
   });
 
+  ipcMain.handle('profiles:export', async (_event, request = {}) => {
+    assertObject('profiles:export', request);
+
+    const profiles = profileStore.listProfiles().map(normalizeProfileForExport);
+    if (profiles.length === 0) {
+      throw new Error('No profiles available to export.');
+    }
+
+    const defaultPath = path.join(
+      resolveExportDirectory(),
+      `aerosync-profiles-${fileTimestamp()}.json`
+    );
+    const saveResult = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Profiles',
+      defaultPath,
+      filters: [
+        { name: 'JSON', extensions: ['json'] }
+      ]
+    });
+
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { saved: false };
+    }
+
+    const payload = {
+      format: PROFILE_EXPORT_SCHEMA,
+      exportedAt: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      profiles
+    };
+    fs.writeFileSync(saveResult.filePath, JSON.stringify(payload, null, 2), 'utf8');
+
+    return {
+      saved: true,
+      path: saveResult.filePath,
+      count: profiles.length
+    };
+  });
+
+  ipcMain.handle('profiles:import', async () => {
+    const openResult = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Profiles',
+      properties: ['openFile'],
+      filters: [
+        { name: 'JSON', extensions: ['json'] }
+      ]
+    });
+
+    if (openResult.canceled || !openResult.filePaths.length) {
+      return { imported: false };
+    }
+
+    const filePath = openResult.filePaths[0];
+    const rawText = fs.readFileSync(filePath, 'utf8');
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (error) {
+      throw new Error(`Invalid JSON file: ${error.message}`);
+    }
+
+    const importedProfiles = extractProfilesFromImportPayload(parsed);
+    if (importedProfiles.length === 0) {
+      throw new Error('No profiles found in import file.');
+    }
+
+    const existingIds = new Set(profileStore.listProfiles().map((item) => String(item.id || '')));
+    let createdCount = 0;
+    let updatedCount = 0;
+    let importedCount = 0;
+    const warnings = [];
+    const errors = [];
+
+    for (let index = 0; index < importedProfiles.length; index += 1) {
+      try {
+        const normalized = normalizeImportedProfile(importedProfiles[index], index);
+        for (const warning of normalized.warnings) {
+          warnings.push(warning);
+        }
+
+        const savedProfile = profileStore.saveProfile(normalized.profile);
+        importedCount += 1;
+
+        if (existingIds.has(savedProfile.id)) {
+          updatedCount += 1;
+        } else {
+          existingIds.add(savedProfile.id);
+          createdCount += 1;
+        }
+      } catch (error) {
+        errors.push(String(error && error.message ? error.message : error));
+      }
+    }
+
+    if (importedCount === 0) {
+      const details = errors.slice(0, 3).join(' | ');
+      throw new Error(
+        details
+          ? `No valid profiles imported. ${details}`
+          : 'No valid profiles imported.'
+      );
+    }
+
+    return {
+      imported: true,
+      path: filePath,
+      importedCount,
+      createdCount,
+      updatedCount,
+      warningCount: warnings.length,
+      warnings,
+      errorCount: errors.length,
+      errors,
+      allProfiles: profileStore.listProfiles()
+    };
+  });
+
   ipcMain.handle('dialog:pickDirectory', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
@@ -542,6 +818,46 @@ function registerIpcHandlers() {
 
   ipcMain.handle('app:update-check', async () => {
     return checkForAppUpdate();
+  });
+
+  ipcMain.handle('app:export-diagnostics', async (_event, request = {}) => {
+    const payload = assertObject('app:export-diagnostics', request);
+    const sanitizedRendererPayload = sanitizeDiagnosticValue(payload);
+
+    const defaultPath = path.join(
+      resolveExportDirectory(),
+      `aerosync-diagnostics-${fileTimestamp()}.json`
+    );
+    const saveResult = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Diagnostics',
+      defaultPath,
+      filters: [
+        { name: 'JSON', extensions: ['json'] }
+      ]
+    });
+
+    if (saveResult.canceled || !saveResult.filePath) {
+      return { saved: false };
+    }
+
+    const diagnostics = {
+      format: DIAGNOSTICS_EXPORT_SCHEMA,
+      generatedAt: new Date().toISOString(),
+      appVersion: app.getVersion(),
+      runtime: {
+        platform: process.platform,
+        arch: process.arch,
+        node: process.version,
+        electron: process.versions.electron
+      },
+      renderer: sanitizedRendererPayload
+    };
+
+    fs.writeFileSync(saveResult.filePath, JSON.stringify(diagnostics, null, 2), 'utf8');
+    return {
+      saved: true,
+      path: saveResult.filePath
+    };
   });
 
   ipcMain.handle('app:open-external', async (_event, request = {}) => {

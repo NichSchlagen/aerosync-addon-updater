@@ -8,6 +8,25 @@ Linux default path:
 
 - `~/.config/aerosync-addon-updater/profiles.json`
 
+## Profile Import / Export
+
+Top-bar menu actions:
+
+- `File -> Export Profiles...`
+- `File -> Import Profiles...`
+
+Export format:
+
+- JSON payload with schema marker `aerosync.profiles.v1`
+- includes profile configuration fields (`name`, `host`, `productDir`, `channel`, `packageVersion`, `ignoreList`)
+- includes credentials only when `rememberAuth` is enabled and credentials are currently available in memory
+
+Import behavior:
+
+- merges/upserts by profile `id`
+- invalid entries are skipped with warnings/errors
+- if an entry has `rememberAuth = true` but missing login/key, import disables `rememberAuth` for that entry
+
 ## What Is Stored
 
 Per profile:
@@ -68,6 +87,18 @@ The selected UI language is also stored locally in browser storage:
 
 - key: `aerosync.language`
 - scope: renderer local storage for this app
+
+## Diagnostics Export
+
+Top-bar menu action:
+
+- `Actions -> Export Diagnostics...`
+
+Diagnostics export format:
+
+- JSON payload with schema marker `aerosync.diagnostics.v1`
+- includes app/runtime metadata, current UI state, anonymized profile summary, and current log output
+- sensitive-looking fields are redacted during export in main process (for example keys containing `password`, `token`, `license`, `login`, `credential`, `auth`)
 
 ## Plan Cache
 

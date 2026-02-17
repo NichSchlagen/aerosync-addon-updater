@@ -100,6 +100,12 @@ Examples:
 - `Ctrl/Cmd + L`: Clear log
 - `Ctrl/Cmd + U`: Check app update
 
+Additional menu actions (top bar):
+
+- `File -> Import Profiles...`: load profiles from a JSON export
+- `File -> Export Profiles...`: export all current profiles to JSON
+- `Actions -> Export Diagnostics...`: export a diagnostics JSON (runtime + anonymized profile summary + current UI log)
+
 ## App Update Checker
 
 The app can check whether a newer AeroSync version is available on GitHub.

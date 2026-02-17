@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('aeroApi', {
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
   saveProfile: (profile) => ipcRenderer.invoke('profiles:save', profile),
   deleteProfile: (profileId) => ipcRenderer.invoke('profiles:delete', profileId),
+  exportProfiles: (payload) => ipcRenderer.invoke('profiles:export', payload),
+  importProfiles: () => ipcRenderer.invoke('profiles:import'),
 
   pickDirectory: () => ipcRenderer.invoke('dialog:pickDirectory'),
 
@@ -12,6 +14,7 @@ contextBridge.exposeInMainWorld('aeroApi', {
 
   getAppVersion: () => ipcRenderer.invoke('app:get-version'),
   checkAppUpdate: () => ipcRenderer.invoke('app:update-check'),
+  exportDiagnostics: (payload) => ipcRenderer.invoke('app:export-diagnostics', payload),
   openExternalUrl: (url) => ipcRenderer.invoke('app:open-external', { url }),
   openPath: (targetPath) => ipcRenderer.invoke('app:open-path', { path: targetPath }),
   updateMenuState: (state) => ipcRenderer.invoke('menu:update-state', state),
