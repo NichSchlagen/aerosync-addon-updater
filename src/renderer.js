@@ -7,11 +7,14 @@ const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
   PROFILE_SAVE: 'profile:save',
   PROFILE_DELETE: 'profile:delete',
+  PROFILE_IMPORT: 'profile:import',
+  PROFILE_EXPORT: 'profile:export',
   PROFILE_OPEN_DIR: 'profile:open-dir',
   UPDATES_CHECK: 'updates:check',
   UPDATES_INSTALL: 'updates:install',
   UPDATES_PAUSE_RESUME: 'updates:pause-resume',
   UPDATES_CANCEL: 'updates:cancel',
+  APP_EXPORT_DIAGNOSTICS: 'app:export-diagnostics',
   APP_CHECK_UPDATE: 'app:check-update',
   LOG_CLEAR: 'log:clear'
 });
@@ -1188,6 +1191,143 @@ async function onOpenSelectedProfileDirectory() {
   }
 }
 
+function buildDiagnosticsExportPayload() {
+  const selected = getSelectedProfile();
+  const profileSummaries = state.profiles.map((profile) => {
+    const productDir = String(profile.productDir || '').trim();
+    const depth = productDir
+      ? productDir.split(/[\\/]+/).filter(Boolean).length
+      : 0;
+
+    return {
+      id: String(profile.id || ''),
+      host: String(profile.host || ''),
+      channel: String(profile.channel || 'release'),
+      packageVersion: Number(profile.packageVersion || 0),
+      rememberAuth: Boolean(profile.rememberAuth),
+      ignoreRuleCount: Array.isArray(profile.ignoreList) ? profile.ignoreList.length : 0,
+      productDirDepth: depth,
+      profileNameLength: String(profile.name || '').length
+    };
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    ui: {
+      selectedProfileId: selected ? selected.id : null,
+      checkRunning: state.checkRunning,
+      installRunning: state.installRunning,
+      installPaused: state.installPaused,
+      appUpdateRunning: state.appUpdateRunning
+    },
+    language: {
+      code: state.i18n.locale,
+      locale: state.i18n.localeTag
+    },
+    profiles: {
+      count: profileSummaries.length,
+      items: profileSummaries
+    },
+    currentPlan: state.currentPlan
+      ? {
+          profileId: state.currentPlan.profileId,
+          planId: state.currentPlan.planId,
+          summary: state.currentPlan.summary || {},
+          actionCount: Array.isArray(state.currentPlan.actions) ? state.currentPlan.actions.length : 0,
+          optionalPackageCount: Array.isArray(state.currentPlan.optionalPackages)
+            ? state.currentPlan.optionalPackages.length
+            : 0
+        }
+      : null,
+    logText: String(el.logBox.textContent || '')
+  };
+}
+
+async function onExportProfilesFromMenu() {
+  try {
+    if (!Array.isArray(state.profiles) || state.profiles.length === 0) {
+      window.alert(t('alert.noProfilesToExport'));
+      return;
+    }
+
+    const result = await window.aeroApi.exportProfiles({});
+    if (!result || !result.saved) {
+      return;
+    }
+
+    setStatus(t('status.profilesExported', { count: result.count }));
+    log(t('log.profilesExported', { count: result.count, path: result.path }));
+  } catch (error) {
+    log(t('log.profilesExportError', { message: error.message }));
+    window.alert(t('alert.profilesExportFailed', { message: error.message }));
+  }
+}
+
+async function onImportProfilesFromMenu() {
+  try {
+    const result = await window.aeroApi.importProfiles();
+    if (!result || !result.imported) {
+      return;
+    }
+
+    state.profiles = Array.isArray(result.allProfiles) ? result.allProfiles : [];
+    if (!state.profiles.some((item) => item.id === state.selectedProfileId)) {
+      state.selectedProfileId = state.profiles[0]?.id || null;
+    }
+
+    const selected = getSelectedProfile();
+    fillForm(selected || null);
+    el.selectedProfileName.textContent = selected?.name || t('profile.none');
+
+    state.currentPlan = null;
+    resetOptionalPackages();
+    resetSummary();
+    resetProgressUi();
+    renderActions([]);
+    renderProfiles();
+    syncActionButtons();
+
+    setStatus(t('status.profilesImported', { count: result.importedCount }));
+    log(t('log.profilesImported', {
+      count: result.importedCount,
+      created: result.createdCount,
+      updated: result.updatedCount,
+      path: result.path
+    }));
+
+    if (Number(result.warningCount || 0) > 0 && Array.isArray(result.warnings)) {
+      for (const warning of result.warnings) {
+        log(t('log.hintPrefix', { message: warning }));
+      }
+    }
+
+    if (Number(result.errorCount || 0) > 0 && Array.isArray(result.errors)) {
+      for (const entry of result.errors.slice(0, 8)) {
+        log(t('log.hintPrefix', { message: entry }));
+      }
+    }
+  } catch (error) {
+    log(t('log.profilesImportError', { message: error.message }));
+    window.alert(t('alert.profilesImportFailed', { message: error.message }));
+  }
+}
+
+async function onExportDiagnosticsFromMenu() {
+  try {
+    const diagnostics = buildDiagnosticsExportPayload();
+    const result = await window.aeroApi.exportDiagnostics(diagnostics);
+    if (!result || !result.saved) {
+      return;
+    }
+
+    setStatus(t('status.diagnosticsExported'));
+    log(t('log.diagnosticsExported', { path: result.path }));
+  } catch (error) {
+    log(t('log.diagnosticsExportError', { message: error.message }));
+    window.alert(t('alert.diagnosticsExportFailed', { message: error.message }));
+  }
+}
+
 async function handleMenuAction(action) {
   switch (String(action || '')) {
     case MENU_ACTIONS.PROFILE_NEW:
@@ -1198,6 +1338,12 @@ async function handleMenuAction(action) {
       return;
     case MENU_ACTIONS.PROFILE_DELETE:
       await onDeleteProfileClicked();
+      return;
+    case MENU_ACTIONS.PROFILE_IMPORT:
+      await onImportProfilesFromMenu();
+      return;
+    case MENU_ACTIONS.PROFILE_EXPORT:
+      await onExportProfilesFromMenu();
       return;
     case MENU_ACTIONS.PROFILE_OPEN_DIR:
       await onOpenSelectedProfileDirectory();
@@ -1213,6 +1359,9 @@ async function handleMenuAction(action) {
       return;
     case MENU_ACTIONS.UPDATES_CANCEL:
       await onCancelInstall();
+      return;
+    case MENU_ACTIONS.APP_EXPORT_DIAGNOSTICS:
+      await onExportDiagnosticsFromMenu();
       return;
     case MENU_ACTIONS.APP_CHECK_UPDATE:
       await onCheckAppUpdate();

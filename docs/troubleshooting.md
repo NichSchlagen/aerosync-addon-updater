@@ -45,6 +45,25 @@ Actions:
 2. open `https://github.com/NichSchlagen/aerosync-addon-updater/releases` manually
 3. compare your installed version chip (`vX.Y.Z`) with the latest release tag
 
+## Profile Import Failed
+
+Symptoms:
+
+- dialog after `File -> Import Profiles...` shows an error
+- no profiles are added/updated
+
+Possible causes:
+
+- selected file is not valid JSON
+- JSON contains no `profiles` array
+- all entries are invalid (for example missing `name` or `productDir`)
+
+Actions:
+
+1. validate JSON syntax
+2. ensure payload includes a `profiles` array (or a root array) with profile objects
+3. re-export from another AeroSync instance and import that file
+
 ## No Updates Shown But Folder Is Empty
 
 Possible causes:
@@ -101,6 +120,7 @@ Actions:
 2. retry install
 3. if it keeps failing, run `Repair / Verify` mode once
 4. if persistent, open a GitHub issue with exact error and file path
+5. attach a diagnostics export from `Actions -> Export Diagnostics...`
 
 ## Planned File Table Looks Incomplete
 
@@ -123,6 +143,22 @@ Actions:
 4. rely on summary and action counter for full totals
 5. install is still processed against full internal plan
 
+## Diagnostics Export Failed
+
+Symptoms:
+
+- `Actions -> Export Diagnostics...` fails
+
+Possible causes:
+
+- selected target file is not writable
+- filesystem permission or disk-space issue
+
+Actions:
+
+1. retry and choose another directory
+2. verify write permissions and available disk space
+
 ## Alpha/Beta Not Available
 
 The app may fallback automatically to the next available channel snapshot and record a warning.
@@ -141,3 +177,4 @@ If you run into problems, open a GitHub issue and include:
 - what you clicked
 - reproduction steps
 - app version and OS
+- diagnostics export file from `Actions -> Export Diagnostics...`
