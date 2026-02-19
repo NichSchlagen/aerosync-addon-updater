@@ -5,12 +5,15 @@ const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = requir
 const { ProfileStore } = require('./lib/profile-store');
 const { LanguageStore } = require('./lib/language-store');
 const { UpdateClient, UpdateHttpError } = require('./lib/update-client');
+const { parseJsonSafe } = require('./lib/safe-json');
+const { createLogger } = require('./lib/logger');
 
 let mainWindow;
 let profileStore;
 let languageStore;
 let updaterClient;
 let activeInstall = null;
+const logger = createLogger('main');
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -726,11 +729,11 @@ function registerIpcHandlers() {
 
     const filePath = openResult.filePaths[0];
     const rawText = fs.readFileSync(filePath, 'utf8');
-    let parsed;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch (error) {
-      throw new Error(`Invalid JSON file: ${error.message}`);
+    const parsed = parseJsonSafe(rawText);
+
+    if (!parsed) {
+      logger.error('Profile import failed: invalid JSON', { filePath });
+      throw new Error('Invalid JSON file: Unable to parse profile data.');
     }
 
     const importedProfiles = extractProfilesFromImportPayload(parsed);
@@ -1007,7 +1010,17 @@ app.whenReady().then(() => {
   const langDirFromEnv = process.env.AEROSYNC_LANG_DIR;
   const languageDir = resolveLanguageDirectory(langDirFromEnv);
   const hasSafeStorage = safeStorage.isEncryptionAvailable();
+
+  logger.info('Application starting', {
+    version: app.getVersion(),
+    platform: process.platform,
+    dataDir,
+    languageDir,
+    hasSafeStorage
+  });
+
   if (!hasSafeStorage) {
+    logger.warn('safeStorage encryption unavailable: credentials will be stored as plain text.');
     console.warn('safeStorage encryption unavailable: credentials will be stored as plain text.');
   }
 
@@ -1028,6 +1041,8 @@ app.whenReady().then(() => {
   createMainWindow();
   buildApplicationMenu();
 
+  logger.info('Application initialized successfully');
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
@@ -1036,6 +1051,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  logger.info('All windows closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
