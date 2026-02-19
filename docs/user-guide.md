@@ -82,8 +82,18 @@ Available controls:
 - `Pause`: waits at safe boundary between file actions
 - `Resume`: continues processing actions
 - `Cancel`: aborts current run and marks run as cancelled
+- `Rollback`: restores the latest pre-install snapshot for the selected profile
 
 While check/install is running, profile switching, profile edits, and language switching are blocked.
+
+## Rollback Snapshot
+
+Before every installation, the app creates a rollback snapshot for the selected profile.
+
+- snapshot includes all files that will be changed or deleted by the install plan
+- `Rollback` restores backed-up files and removes files that were newly created by the failed/undesired install
+- only the latest snapshot per profile is used for rollback
+- after rollback, run `Check Updates` again before starting a new install
 
 ## App Menu And Shortcuts
 

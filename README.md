@@ -22,6 +22,7 @@ Full documentation is available in [`docs/`](./docs/README.md):
 - Build update plans in normal, fresh install, or repair/verify mode
 - Verify files with MD5
 - Download, unpack (gzip when required), and install updates
+- Create pre-install snapshots and rollback the last install per profile
 - Pause, resume, and cancel running installations
 - Check for new app versions from GitHub releases
 - Provide native application menu actions and keyboard shortcuts

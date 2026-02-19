@@ -104,3 +104,12 @@ Diagnostics export format:
 
 Update plans are kept in memory (`planCache`) and tied to profile id.
 A plan must be installed by the same profile it was created for.
+
+## Install Snapshots (Rollback)
+
+Before each installation, the app stores a rollback snapshot in user data:
+
+- Linux default base: `~/.config/aerosync-addon-updater/install-snapshots/`
+- snapshots are grouped per profile id
+- each snapshot stores a manifest plus backed-up file copies for affected paths
+- rollback consumes the latest snapshot for that profile and removes it after successful restore

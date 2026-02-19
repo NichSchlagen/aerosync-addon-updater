@@ -79,6 +79,12 @@ This is why network download can be much smaller than disk size.
 
 ## 7) Install Execution
 
+Before processing actions, the app creates a rollback snapshot for the selected profile.
+
+- each affected relative path is captured once
+- existing local files are copied to snapshot storage
+- missing files are tracked so rollback can remove them later
+
 For each action:
 
 - emit progress event
@@ -92,7 +98,16 @@ For each action:
 
 If checksum remains wrong, install fails with a checksum mismatch error.
 
-## 8) Completion
+## 8) Rollback Execution
+
+Rollback uses the latest available snapshot for the selected profile.
+
+- restore backed-up files in reverse order
+- remove files that did not exist before install
+- clean up empty parent directories where possible
+- remove consumed snapshot after successful rollback
+
+## 9) Completion
 
 On success:
 

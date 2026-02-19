@@ -36,6 +36,7 @@ const menuState = {
   hasPlan: false,
   checkRunning: false,
   installRunning: false,
+  rollbackRunning: false,
   installPaused: false,
   appUpdateRunning: false
 };
@@ -300,8 +301,8 @@ function applyMenuState() {
     return;
   }
 
-  const lockProfile = menuState.checkRunning || menuState.installRunning;
-  const checkEnabled = !menuState.checkRunning && !menuState.installRunning;
+  const lockProfile = menuState.checkRunning || menuState.installRunning || menuState.rollbackRunning;
+  const checkEnabled = !menuState.checkRunning && !menuState.installRunning && !menuState.rollbackRunning;
   const updatesCheckEnabled = checkEnabled && menuState.hasProfile;
   const appUpdateEnabled = checkEnabled && !menuState.appUpdateRunning;
 
@@ -343,6 +344,10 @@ function updateMenuState(nextState = {}) {
 
   if (Object.prototype.hasOwnProperty.call(nextState, 'installRunning')) {
     menuState.installRunning = Boolean(nextState.installRunning);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(nextState, 'rollbackRunning')) {
+    menuState.rollbackRunning = Boolean(nextState.rollbackRunning);
   }
 
   if (Object.prototype.hasOwnProperty.call(nextState, 'installPaused')) {
@@ -1003,6 +1008,34 @@ function registerIpcHandlers() {
     }
     return { cancelled: true };
   });
+
+  ipcMain.handle('updates:rollback-info', async (_event, request) => {
+    const payload = assertObject('updates:rollback-info', request);
+    const profileId = assertNonEmptyString('profileId', payload.profileId);
+
+    return updaterClient.getRollbackInfo(profileId);
+  });
+
+  ipcMain.handle('updates:rollback-last', async (_event, request) => {
+    const payload = assertObject('updates:rollback-last', request);
+    const profileId = assertNonEmptyString('profileId', payload.profileId);
+
+    if (activeInstall) {
+      throw new Error('Cannot run rollback while installation is active.');
+    }
+
+    const profile = await profileStore.getProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found.');
+    }
+
+    const result = await updaterClient.rollbackLatestSnapshot(profile);
+    if (Number.isFinite(Number(result.sourceSnapshotNumber))) {
+      await profileStore.setPackageVersion(profileId, Number(result.sourceSnapshotNumber));
+    }
+
+    return result;
+  });
 }
 
 app.whenReady().then(() => {
@@ -1034,7 +1067,8 @@ app.whenReady().then(() => {
   });
   languageStore = new LanguageStore(languageDir);
   updaterClient = new UpdateClient({
-    tempDir: app.getPath('temp')
+    tempDir: app.getPath('temp'),
+    snapshotDir: path.join(dataDir, 'install-snapshots')
   });
 
   registerIpcHandlers();

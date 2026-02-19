@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('aeroApi', {
 
   checkUpdates: (payload) => ipcRenderer.invoke('updates:check', payload),
   installUpdates: (payload) => ipcRenderer.invoke('updates:install', payload),
+  getRollbackInfo: (payload) => ipcRenderer.invoke('updates:rollback-info', payload),
+  rollbackLastInstall: (payload) => ipcRenderer.invoke('updates:rollback-last', payload),
   pauseInstall: () => ipcRenderer.invoke('updates:pause'),
   resumeInstall: () => ipcRenderer.invoke('updates:resume'),
   cancelInstall: () => ipcRenderer.invoke('updates:cancel'),
