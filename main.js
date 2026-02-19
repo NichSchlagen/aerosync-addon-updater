@@ -656,26 +656,26 @@ function registerIpcHandlers() {
   };
 
   ipcMain.handle('profiles:list', async () => {
-    return profileStore.listProfiles();
+    return await profileStore.listProfiles();
   });
 
   ipcMain.handle('profiles:save', async (_event, profile) => {
-    const saved = profileStore.saveProfile(profile);
+    const saved = await profileStore.saveProfile(profile);
     return {
       profile: saved,
-      allProfiles: profileStore.listProfiles()
+      allProfiles: await profileStore.listProfiles()
     };
   });
 
   ipcMain.handle('profiles:delete', async (_event, profileId) => {
-    profileStore.deleteProfile(profileId);
-    return profileStore.listProfiles();
+    await profileStore.deleteProfile(profileId);
+    return await profileStore.listProfiles();
   });
 
   ipcMain.handle('profiles:export', async (_event, request = {}) => {
     assertObject('profiles:export', request);
 
-    const profiles = profileStore.listProfiles().map(normalizeProfileForExport);
+    const profiles = (await profileStore.listProfiles()).map(normalizeProfileForExport);
     if (profiles.length === 0) {
       throw new Error('No profiles available to export.');
     }
@@ -738,7 +738,7 @@ function registerIpcHandlers() {
       throw new Error('No profiles found in import file.');
     }
 
-    const existingIds = new Set(profileStore.listProfiles().map((item) => String(item.id || '')));
+    const existingIds = new Set((await profileStore.listProfiles()).map((item) => String(item.id || '')));
     let createdCount = 0;
     let updatedCount = 0;
     let importedCount = 0;
@@ -752,7 +752,7 @@ function registerIpcHandlers() {
           warnings.push(warning);
         }
 
-        const savedProfile = profileStore.saveProfile(normalized.profile);
+        const savedProfile = await profileStore.saveProfile(normalized.profile);
         importedCount += 1;
 
         if (existingIds.has(savedProfile.id)) {
@@ -785,7 +785,7 @@ function registerIpcHandlers() {
       warnings,
       errorCount: errors.length,
       errors,
-      allProfiles: profileStore.listProfiles()
+      allProfiles: await profileStore.listProfiles()
     };
   });
 
@@ -893,7 +893,7 @@ function registerIpcHandlers() {
   ipcMain.handle('updates:check', async (_event, request) => {
     const payload = assertObject('updates:check', request);
     const profileId = assertNonEmptyString('profileId', payload.profileId);
-    const profile = profileStore.getProfile(profileId);
+    const profile = await profileStore.getProfile(profileId);
     const runtimeProfile = buildRuntimeProfileWithCredentials(profile, payload);
     const options = sanitizeCheckOptions(payload.options);
 
@@ -913,7 +913,7 @@ function registerIpcHandlers() {
       throw new Error('An installation is already running.');
     }
 
-    const profile = profileStore.getProfile(profileId);
+    const profile = await profileStore.getProfile(profileId);
     if (!profile) {
       throw new Error('Profile not found.');
     }
@@ -950,7 +950,7 @@ function registerIpcHandlers() {
         && !result.cancelled
         && Number.isFinite(Number(result.snapshotNumber))
       ) {
-        profileStore.setPackageVersion(profileId, Number(result.snapshotNumber));
+        await profileStore.setPackageVersion(profileId, Number(result.snapshotNumber));
       }
 
       return result;
