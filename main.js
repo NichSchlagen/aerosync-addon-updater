@@ -5,12 +5,15 @@ const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = requir
 const { ProfileStore } = require('./lib/profile-store');
 const { LanguageStore } = require('./lib/language-store');
 const { UpdateClient, UpdateHttpError } = require('./lib/update-client');
+const { parseJsonSafe } = require('./lib/safe-json');
+const { createLogger } = require('./lib/logger');
 
 let mainWindow;
 let profileStore;
 let languageStore;
 let updaterClient;
 let activeInstall = null;
+const logger = createLogger('main');
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -656,26 +659,26 @@ function registerIpcHandlers() {
   };
 
   ipcMain.handle('profiles:list', async () => {
-    return profileStore.listProfiles();
+    return await profileStore.listProfiles();
   });
 
   ipcMain.handle('profiles:save', async (_event, profile) => {
-    const saved = profileStore.saveProfile(profile);
+    const saved = await profileStore.saveProfile(profile);
     return {
       profile: saved,
-      allProfiles: profileStore.listProfiles()
+      allProfiles: await profileStore.listProfiles()
     };
   });
 
   ipcMain.handle('profiles:delete', async (_event, profileId) => {
-    profileStore.deleteProfile(profileId);
-    return profileStore.listProfiles();
+    await profileStore.deleteProfile(profileId);
+    return await profileStore.listProfiles();
   });
 
   ipcMain.handle('profiles:export', async (_event, request = {}) => {
     assertObject('profiles:export', request);
 
-    const profiles = profileStore.listProfiles().map(normalizeProfileForExport);
+    const profiles = (await profileStore.listProfiles()).map(normalizeProfileForExport);
     if (profiles.length === 0) {
       throw new Error('No profiles available to export.');
     }
@@ -726,11 +729,11 @@ function registerIpcHandlers() {
 
     const filePath = openResult.filePaths[0];
     const rawText = fs.readFileSync(filePath, 'utf8');
-    let parsed;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch (error) {
-      throw new Error(`Invalid JSON file: ${error.message}`);
+    const parsed = parseJsonSafe(rawText);
+
+    if (!parsed) {
+      logger.error('Profile import failed: invalid JSON', { filePath });
+      throw new Error('Invalid JSON file: Unable to parse profile data.');
     }
 
     const importedProfiles = extractProfilesFromImportPayload(parsed);
@@ -738,7 +741,7 @@ function registerIpcHandlers() {
       throw new Error('No profiles found in import file.');
     }
 
-    const existingIds = new Set(profileStore.listProfiles().map((item) => String(item.id || '')));
+    const existingIds = new Set((await profileStore.listProfiles()).map((item) => String(item.id || '')));
     let createdCount = 0;
     let updatedCount = 0;
     let importedCount = 0;
@@ -752,7 +755,7 @@ function registerIpcHandlers() {
           warnings.push(warning);
         }
 
-        const savedProfile = profileStore.saveProfile(normalized.profile);
+        const savedProfile = await profileStore.saveProfile(normalized.profile);
         importedCount += 1;
 
         if (existingIds.has(savedProfile.id)) {
@@ -785,7 +788,7 @@ function registerIpcHandlers() {
       warnings,
       errorCount: errors.length,
       errors,
-      allProfiles: profileStore.listProfiles()
+      allProfiles: await profileStore.listProfiles()
     };
   });
 
@@ -893,7 +896,7 @@ function registerIpcHandlers() {
   ipcMain.handle('updates:check', async (_event, request) => {
     const payload = assertObject('updates:check', request);
     const profileId = assertNonEmptyString('profileId', payload.profileId);
-    const profile = profileStore.getProfile(profileId);
+    const profile = await profileStore.getProfile(profileId);
     const runtimeProfile = buildRuntimeProfileWithCredentials(profile, payload);
     const options = sanitizeCheckOptions(payload.options);
 
@@ -913,7 +916,7 @@ function registerIpcHandlers() {
       throw new Error('An installation is already running.');
     }
 
-    const profile = profileStore.getProfile(profileId);
+    const profile = await profileStore.getProfile(profileId);
     if (!profile) {
       throw new Error('Profile not found.');
     }
@@ -950,7 +953,7 @@ function registerIpcHandlers() {
         && !result.cancelled
         && Number.isFinite(Number(result.snapshotNumber))
       ) {
-        profileStore.setPackageVersion(profileId, Number(result.snapshotNumber));
+        await profileStore.setPackageVersion(profileId, Number(result.snapshotNumber));
       }
 
       return result;
@@ -1007,7 +1010,17 @@ app.whenReady().then(() => {
   const langDirFromEnv = process.env.AEROSYNC_LANG_DIR;
   const languageDir = resolveLanguageDirectory(langDirFromEnv);
   const hasSafeStorage = safeStorage.isEncryptionAvailable();
+
+  logger.info('Application starting', {
+    version: app.getVersion(),
+    platform: process.platform,
+    dataDir,
+    languageDir,
+    hasSafeStorage
+  });
+
   if (!hasSafeStorage) {
+    logger.warn('safeStorage encryption unavailable: credentials will be stored as plain text.');
     console.warn('safeStorage encryption unavailable: credentials will be stored as plain text.');
   }
 
@@ -1028,6 +1041,8 @@ app.whenReady().then(() => {
   createMainWindow();
   buildApplicationMenu();
 
+  logger.info('Application initialized successfully');
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
@@ -1036,6 +1051,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  logger.info('All windows closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
