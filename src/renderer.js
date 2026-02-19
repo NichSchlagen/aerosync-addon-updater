@@ -34,6 +34,8 @@ const state = {
   },
   checkRunning: false,
   installRunning: false,
+  rollbackRunning: false,
+  rollbackAvailable: false,
   installPaused: false,
   appUpdateRunning: false,
   i18n: {
@@ -72,6 +74,7 @@ const el = {
   btnPickDir: document.getElementById('btnPickDir'),
   btnCheck: document.getElementById('btnCheck'),
   btnInstall: document.getElementById('btnInstall'),
+  btnRollback: document.getElementById('btnRollback'),
   btnPause: document.getElementById('btnPause'),
   btnCancel: document.getElementById('btnCancel'),
   btnClearLog: document.getElementById('btnClearLog'),
@@ -471,6 +474,7 @@ function syncNativeMenuState() {
     hasPlan: Boolean(state.currentPlan && Array.isArray(state.currentPlan.actions) && state.currentPlan.actions.length > 0),
     checkRunning: state.checkRunning,
     installRunning: state.installRunning,
+    rollbackRunning: state.rollbackRunning,
     installPaused: state.installPaused,
     appUpdateRunning: state.appUpdateRunning
   };
@@ -487,13 +491,17 @@ function syncNativeMenuState() {
 }
 
 function syncActionButtons() {
-  const lockProfileUi = state.installRunning || state.checkRunning;
+  const lockProfileUi = state.installRunning || state.checkRunning || state.rollbackRunning;
   const hasPlanActions = Boolean(state.currentPlan && state.currentPlan.actions && state.currentPlan.actions.length > 0);
-  el.btnCheck.disabled = state.checkRunning || state.installRunning;
-  el.btnInstall.disabled = state.checkRunning || state.installRunning || !hasPlanActions;
+  const hasSelectedProfile = Boolean(getSelectedProfile());
+  el.btnCheck.disabled = state.checkRunning || state.installRunning || state.rollbackRunning;
+  el.btnInstall.disabled = state.checkRunning || state.installRunning || state.rollbackRunning || !hasPlanActions;
+  if (el.btnRollback) {
+    el.btnRollback.disabled = state.checkRunning || state.installRunning || state.rollbackRunning || !hasSelectedProfile || !state.rollbackAvailable;
+  }
   el.btnPause.disabled = !state.installRunning;
   el.btnCancel.disabled = !state.installRunning;
-  el.btnCheckAppUpdate.disabled = state.installRunning || state.checkRunning || state.appUpdateRunning;
+  el.btnCheckAppUpdate.disabled = state.installRunning || state.checkRunning || state.rollbackRunning || state.appUpdateRunning;
   el.btnNewProfile.disabled = lockProfileUi;
   el.btnSaveProfile.disabled = lockProfileUi;
   el.btnDeleteProfile.disabled = lockProfileUi;
@@ -508,6 +516,24 @@ function syncActionButtons() {
     });
 
   syncNativeMenuState();
+}
+
+async function refreshRollbackInfo(profileId = '') {
+  const id = String(profileId || state.selectedProfileId || '').trim();
+  if (!id) {
+    state.rollbackAvailable = false;
+    syncActionButtons();
+    return;
+  }
+
+  try {
+    const info = await window.aeroApi.getRollbackInfo({ profileId: id });
+    state.rollbackAvailable = Boolean(info && info.available);
+  } catch {
+    state.rollbackAvailable = false;
+  }
+
+  syncActionButtons();
 }
 
 function syncFreshModeUi() {
@@ -595,7 +621,7 @@ function renderOptionalPackages(optionalPackages) {
   }
 
   el.optionalPackagesEmpty.hidden = true;
-  const lockProfileUi = state.installRunning || state.checkRunning;
+  const lockProfileUi = state.installRunning || state.checkRunning || state.rollbackRunning;
 
   const rows = packages
     .map((item) => {
@@ -727,7 +753,7 @@ function renderProfiles() {
     `;
 
     li.addEventListener('click', () => {
-      if (state.installRunning || state.checkRunning) {
+      if (state.installRunning || state.checkRunning || state.rollbackRunning) {
         setStatus(t('status.profileSwitchBlocked'));
         log(t('log.profileSwitchBlocked'));
         return;
@@ -744,6 +770,7 @@ function renderProfiles() {
       renderActions([]);
       syncActionButtons();
       setStatus(t('status.profileLoaded'));
+      void refreshRollbackInfo(profile.id);
     });
 
     el.profileList.append(li);
@@ -770,6 +797,7 @@ async function loadProfiles() {
   resetOptionalPackages();
   renderProfiles();
   syncActionButtons();
+  await refreshRollbackInfo();
 }
 
 async function saveProfile() {
@@ -850,7 +878,7 @@ function applyPlanToUi(planResult) {
 }
 
 async function onCheckUpdates() {
-  if (state.installRunning) {
+  if (state.installRunning || state.rollbackRunning) {
     return;
   }
 
@@ -960,7 +988,7 @@ async function onInstallUpdates() {
     return;
   }
 
-  if (state.installRunning) {
+  if (state.installRunning || state.rollbackRunning) {
     return;
   }
 
@@ -983,6 +1011,7 @@ async function onInstallUpdates() {
       log(t('log.installCancelled'));
       state.currentPlan = null;
       log(t('log.runCheckAgain'));
+      await refreshRollbackInfo();
       return;
     }
 
@@ -1012,6 +1041,7 @@ async function onInstallUpdates() {
     }));
 
     state.currentPlan = null;
+    await refreshRollbackInfo();
   } catch (error) {
     const msg = String(error && error.message ? error.message : error);
     if (/cancelled by user|abgebrochen/i.test(msg)) {
@@ -1021,6 +1051,7 @@ async function onInstallUpdates() {
       log(t('log.installCancelled'));
       state.currentPlan = null;
       log(t('log.runCheckAgain'));
+      await refreshRollbackInfo();
     } else {
       setStatus(t('status.installError'));
       log(t('log.installError', { message: msg }));
@@ -1063,7 +1094,7 @@ async function onTogglePauseInstall() {
 }
 
 async function onCheckAppUpdate() {
-  if (state.appUpdateRunning) {
+  if (state.appUpdateRunning || state.rollbackRunning) {
     return;
   }
 
@@ -1118,8 +1149,74 @@ function onCreateNewProfile() {
   resetSummary();
   resetProgressUi();
   renderActions([]);
+  state.rollbackAvailable = false;
   syncActionButtons();
   setStatus(t('status.newProfile'));
+}
+
+async function onRollbackLastInstall() {
+  const selected = getSelectedProfile();
+  if (!selected || state.installRunning || state.checkRunning || state.rollbackRunning) {
+    return;
+  }
+
+  if (!state.rollbackAvailable) {
+    window.alert(t('alert.rollbackUnavailable'));
+    return;
+  }
+
+  const yes = window.confirm(t('confirm.rollbackInstall', { name: selected.name }));
+  if (!yes) {
+    return;
+  }
+
+  try {
+    state.rollbackRunning = true;
+    syncActionButtons();
+    setStatus(t('status.rollbackRunning'));
+    log(t('log.rollbackStarted'));
+
+    const result = await window.aeroApi.rollbackLastInstall({
+      profileId: selected.id
+    });
+
+    const restoredSnapshotNumber = Number(result.sourceSnapshotNumber);
+    if (Number.isFinite(restoredSnapshotNumber) && restoredSnapshotNumber >= 0) {
+      const selectedIndex = state.profiles.findIndex((item) => item.id === selected.id);
+      if (selectedIndex >= 0) {
+        state.profiles[selectedIndex].packageVersion = restoredSnapshotNumber;
+      }
+      el.packageVersion.value = restoredSnapshotNumber;
+    }
+
+    state.currentPlan = null;
+    resetOptionalPackages();
+    resetSummary();
+    resetProgressUi();
+    renderActions([]);
+
+    setStatus(t('status.rollbackCompleted'));
+    log(t('log.rollbackFinished', {
+      restored: Number(result.restored || 0),
+      removed: Number(result.removed || 0)
+    }));
+    log(t('log.runCheckAgain'));
+
+    window.alert(t('alert.rollbackCompleted', {
+      restored: Number(result.restored || 0),
+      removed: Number(result.removed || 0),
+      number: Number(result.sourceSnapshotNumber || 0)
+    }));
+  } catch (error) {
+    const message = String(error && error.message ? error.message : error);
+    setStatus(t('status.rollbackError'));
+    log(t('log.rollbackError', { message }));
+    window.alert(t('alert.rollbackFailed', { message }));
+  } finally {
+    state.rollbackRunning = false;
+    await refreshRollbackInfo(selected.id);
+    syncActionButtons();
+  }
 }
 
 async function onSaveProfileClicked() {
@@ -1435,7 +1532,7 @@ async function onOptionalPackageSelectionChanged(event) {
     return;
   }
 
-  if (state.checkRunning || state.installRunning) {
+  if (state.checkRunning || state.installRunning || state.rollbackRunning) {
     return;
   }
 
@@ -1497,6 +1594,11 @@ function wireEvents() {
   el.btnCancel.addEventListener('click', () => {
     void onCancelInstall();
   });
+  if (el.btnRollback) {
+    el.btnRollback.addEventListener('click', () => {
+      void onRollbackLastInstall();
+    });
+  }
   el.planSearch.addEventListener('input', onPlanSearchChanged);
   el.planActionFilter.addEventListener('change', onPlanActionFilterChanged);
   el.planPageSize.addEventListener('change', onPlanPageSizeChanged);
