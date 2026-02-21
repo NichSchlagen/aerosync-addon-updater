@@ -72,6 +72,7 @@ const el = {
   fieldLicenseKeyWrap: document.getElementById('fieldLicenseKeyWrap'),
   fieldPasswordWrap: document.getElementById('fieldPasswordWrap'),
   fieldIniBuildsProductWrap: document.getElementById('fieldIniBuildsProductWrap'),
+  fieldChannelWrap: document.getElementById('fieldChannelWrap'),
   fieldSinceWrap: document.getElementById('fieldSinceWrap'),
   fieldIniBuildsActivationKeyWrap: document.getElementById('fieldIniBuildsActivationKeyWrap'),
   inibuildsProductId: document.getElementById('inibuildsProductId'),
@@ -864,6 +865,7 @@ function syncProviderFields(options = {}) {
   const isIniBuilds = provider === 'inibuilds';
 
   // iniBuilds: users typically do not know/enter a license key; we fetch the activation/product key from backend.
+  setWrapVisible(el.fieldChannelWrap, !isIniBuilds);
   setWrapVisible(el.fieldLicenseKeyWrap, !isIniBuilds);
   setWrapVisible(el.fieldPasswordWrap, isIniBuilds);
   setWrapVisible(el.fieldIniBuildsProductWrap, isIniBuilds);
