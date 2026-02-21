@@ -53,12 +53,12 @@ Symptoms:
 
 Cause:
 
-- profile is set to `iniBuilds` (foundation mode)
+- profile is set to a provider that is not yet supported
 
 Actions:
 
 1. open profile settings
-2. switch `Update provider` to `X-Updater`
+2. switch `Update provider` to `X-Updater` or `iniBuilds`
 3. save profile
 4. run `Check Updates` again
 

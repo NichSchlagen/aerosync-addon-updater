@@ -25,7 +25,7 @@ Import behavior:
 
 - merges/upserts by profile `id`
 - invalid entries are skipped with warnings/errors
-- if an entry has `rememberAuth = true` but missing login/key, import disables `rememberAuth` for that entry
+- if an entry has `rememberAuth = true` but required credentials are missing for the selected provider, import disables `rememberAuth` for that entry
 
 ## What Is Stored
 
@@ -36,13 +36,14 @@ Per profile:
 - update state: channel, packageVersion
 - rules: ignoreList
 - auth mode: rememberAuth flag
-- credentials: login/license key (only if `Store credentials` is enabled)
+- credentials: login/license key/password (only if `Store credentials` is enabled)
+- iniBuilds fields: inibuildsProductId, inibuildsProductName, inibuildsActivationKey
 
 ## Credentials Without Storage
 
 If `Store credentials in profile` is disabled:
 
-- login/key are not written to `profiles.json`
+- login/license key/password are not written to `profiles.json`
 - credentials are only used from current form input during check/install
 - you need to enter them again after app restart
 
@@ -62,7 +63,7 @@ If `safeStorage` is unavailable:
 If encrypted credentials cannot be decrypted (for example keyring/OS change):
 
 - stored values are treated as unavailable
-- you must re-enter login/key and save profile again
+- you must re-enter credentials and save profile again
 
 ## Language Files
 

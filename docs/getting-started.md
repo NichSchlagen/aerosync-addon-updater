@@ -78,10 +78,11 @@ Artifacts are generated in `dist/`.
 
 ## First App Setup
 
-1. Create a new profile.
+1. Create a new profile and choose the update provider (`X-Updater` or `iniBuilds`).
 2. Set product directory to your aircraft folder.
-3. Enter your account login/email and license key.
+3. For X-Updater: enter login/email and license key. For iniBuilds: enter login/email and password.
 4. Pick a channel (`release`, `beta`, or `alpha`).
-5. Keep `Snapshot number (since)` at your last installed snapshot (or `0` if unknown).
+5. For X-Updater: keep `Snapshot number (since)` at your last installed snapshot (or `0` if unknown).
 6. Click `Check Updates`.
-7. Review plan, then click `Install`.
+7. For iniBuilds: select your product from the dropdown after check completes.
+8. Review plan, then click `Install`.

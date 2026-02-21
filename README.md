@@ -1,6 +1,6 @@
 # AeroSync Addon Updater (Electron)
 
-Desktop updater for X-Plane aircraft add-ons that use the X-Updater service.
+Desktop updater for X-Plane add-ons with support for X-Updater and iniBuilds.
 This app is designed for managing multiple aircraft profiles in one place.
 
 ## Documentation
@@ -17,11 +17,12 @@ Full documentation is available in [`docs/`](./docs/README.md):
 ## What This App Does
 
 - Manage multiple profiles (different aircraft folders, channels, and credentials)
-- Authenticate against `https://update.x-plane.org`
+- Authenticate against X-Updater (`https://update.x-plane.org`) or iniBuilds (`https://manager.inibuilds.com`)
 - Check updates for `release`, `beta`, or `alpha`
 - Build update plans in normal, fresh install, or repair/verify mode
 - Verify files with MD5
 - Download, unpack (gzip when required), and install updates
+- Support iniBuilds provider: Shopify auth, product discovery, ZIP-based per-file update plans, activation key retrieval
 - Create pre-install snapshots and rollback the last install per profile
 - Pause, resume, and cancel running installations
 - Check for new app versions from GitHub releases
@@ -53,7 +54,8 @@ If you want to use the official Java client instead:
 - `preload.js`: secure renderer bridge (`window.aeroApi`)
 - `lib/profile-store.js`: profile storage and credential handling
 - `lib/language-store.js`: external language loading
-- `lib/update-client.js`: update engine (auth, check, install)
+- `lib/update-client.js`: update engine for X-Updater (auth, check, install)
+- `lib/inibuilds-client.js`: update engine for iniBuilds (auth, product discovery, check, install, rollback)
 - `src/`: UI files (HTML/CSS/renderer logic)
 - `languages/`: editable language files (`*.json`)
 

@@ -4,6 +4,9 @@
 
 Each profile represents one aircraft installation.
 
+When creating a new profile (`New`), the app first asks which provider should be used (`xupdater` or `inibuilds`).
+Based on that choice, provider-specific fields are shown and `Update Host` is prefilled with the provider default.
+
 Fields:
 
 - `Profile Name`: free label in the sidebar
@@ -11,9 +14,11 @@ Fields:
 - `Product Directory`: base folder of the product on disk
 - `Login / Email`: account login for the updater service
 - `License Key`: license key for the product
-- `Update provider`: currently `X-Updater`; `iniBuilds` is prepared in profile data model for future native integration
+- `Password (iniBuilds)`: account password for iniBuilds login flow
+- `Update provider`: `X-Updater` or `iniBuilds`
 - `Release Channel`: `release`, `beta`, or `alpha`
-- `Snapshot number (since)`: baseline snapshot for incremental checks
+- `Snapshot number (since)`: baseline snapshot for incremental checks (X-Updater only; iniBuilds has no server snapshot concept)
+- `Activation Key (iniBuilds)`: read-only field showing the DRM activation key fetched from the iniBuilds API; persisted in profile so it is available without re-checking
 - `Ignore list`: paths or patterns to skip during plan/install (one per line)
 - `Fresh Install`: force full reconciliation against current snapshot
 - `Repair / Verify`: hash-check all known files and re-download mismatches
@@ -44,7 +49,7 @@ It defines from which snapshot onward changes are requested.
 6. Click `Install`.
 7. Wait until completion.
 
-After a successful install, the app updates `Snapshot number (since)` automatically to the new snapshot.
+After a successful install, the app updates `Snapshot number (since)` automatically to the new snapshot (X-Updater only).
 If profile fields changed, `Check Updates` auto-saves the profile before starting.
 
 ## Update Modes
@@ -120,17 +125,22 @@ Additional menu actions (top bar):
 ## Provider Support
 
 - `X-Updater` is fully supported for check/install/rollback.
-- `iniBuilds` is now wired as a dedicated provider client in the app architecture and can be selected/saved in profiles.
-- Current implementation step: `Check Updates` performs native API auth + product list probe and reports the result as warnings.
-- Native file plan/install for iniBuilds is not implemented yet.
+- `iniBuilds` is supported for check/install/rollback.
+	- `Check Updates` builds a per-file plan by reading the package ZIP central directory and comparing file CRC32/size against the local product directory.
+	- `Install` verifies the package MD5 (`filesIntegrityHash`, with gunzip fallback) and extracts only the files from the plan.
+	- Deletes are based on a local manifest from the last successful iniBuilds install (to avoid unsafe cleanup of unrelated files).
+	- iniBuilds does not use the `since`/snapshot number field; the UI hides it automatically.
 
 ### iniBuilds Environment Overrides
 
 Optional environment variables for endpoint wiring:
 
 - `AEROSYNC_INIBUILDS_BASE_URL`
-- `AEROSYNC_INIBUILDS_AUTH_PATH` (default: `/api/auth/login`)
-- `AEROSYNC_INIBUILDS_PRODUCTS_PATH` (default: `/api/products`)
+- `AEROSYNC_INIBUILDS_AUTH_PATH` (default: `/api/v4/login`)
+- `AEROSYNC_INIBUILDS_PRODUCTS_PATH` (default: `/api/v4/companies`)
+- `AEROSYNC_INIBUILDS_FILES_URL_PATH` (default: `/api/v4/filesUrl`)
+- `AEROSYNC_INIBUILDS_SHOPIFY_API_URL` (default: `https://inibuilds-store.myshopify.com/api/graphql`)
+- `AEROSYNC_INIBUILDS_SHOPIFY_API_TOKEN` (override only if provider token changes)
 - `AEROSYNC_INIBUILDS_TIMEOUT_MS` (default: `15000`)
 
 If no base URL environment variable is set, the profile `Update Host` is used.

@@ -66,14 +66,34 @@
                   </div>
                 </label>
 
-                <label>
+                <label id="fieldLoginWrap">
                   <span data-i18n="field.login">Login / Email</span>
                   <input id="login" type="text" placeholder="your-login" data-i18n-placeholder="placeholder.login" />
                 </label>
 
-                <label>
+                <label id="fieldLicenseKeyWrap">
                   <span data-i18n="field.licenseKey">License Key</span>
                   <input id="licenseKey" type="password" placeholder="xxxx-xxxx-xxxx" data-i18n-placeholder="placeholder.licenseKey" />
+                </label>
+
+                <label id="fieldPasswordWrap" hidden>
+                  <span data-i18n="field.password">Password (iniBuilds)</span>
+                  <input id="password" type="password" placeholder="your-password" data-i18n-placeholder="placeholder.password" />
+                </label>
+
+                <label id="fieldIniBuildsProductWrap" class="full-row" hidden>
+                  <span data-i18n="field.inibuildsProduct">iniBuilds Produkt</span>
+                  <select id="inibuildsProductId">
+                    <option value="0" selected data-i18n="placeholder.inibuildsProduct">(erst „Updates prüfen“)</option>
+                  </select>
+                </label>
+
+                <label id="fieldIniBuildsActivationKeyWrap" class="full-row" hidden>
+                  <span data-i18n="field.inibuildsActivationKey">Activation / Product Key</span>
+                  <div class="inline-path">
+                    <input id="inibuildsActivationKey" type="text" readonly />
+                    <button id="btnCopyIniBuildsActivationKey" class="btn btn-ghost" type="button" data-i18n="btn.copy">Copy</button>
+                  </div>
                 </label>
                 <label class="full-row">
                   <span data-i18n="field.ignoreList" data-i18n-title="tooltip.ignoreList" title="One path pattern per line. Lines starting with # are ignored.">Ignore List</span>
@@ -103,7 +123,7 @@ objects/custom.obj"></textarea>
                   </select>
                 </label>
 
-                <label>
+                <label id="fieldSinceWrap">
                   <span data-i18n="field.since">Snapshot Number (since)</span>
                   <input id="packageVersion" type="number" min="0" step="1" value="0" />
                 </label>
@@ -138,8 +158,8 @@ objects/custom.obj"></textarea>
             <div class="progress-file" id="progressFile">-</div>
           </section>
 
-          <section class="summary-grid">
-            <article class="summary-card">
+          <section class="summary-grid" id="summaryGrid">
+            <article class="summary-card" id="sumSnapshotCard">
               <h3 data-i18n="summary.snapshot">Snapshot</h3>
               <p id="sumSnapshot">-</p>
             </article>
@@ -161,7 +181,7 @@ objects/custom.obj"></textarea>
             </article>
           </section>
 
-          <section class="panel">
+          <section class="panel" id="optionalPackagesPanel">
             <div class="panel-head">
               <h3 class="panel-title" data-i18n="panel.optionalPackages">Optional packages</h3>
               <span id="optionalPackageCount" class="chip">0 entries</span>

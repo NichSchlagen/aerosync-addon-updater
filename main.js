@@ -92,6 +92,9 @@ function normalizeProfileForExport(profile) {
     productDir: String(source.productDir || '').trim(),
     login: String(source.login || '').trim(),
     licenseKey: String(source.licenseKey || '').trim(),
+    password: String(source.password || '').trim(),
+    inibuildsProductId: Number(source.inibuildsProductId || 0),
+    inibuildsProductName: String(source.inibuildsProductName || '').trim(),
     packageVersion: Number(source.packageVersion || 0),
     rememberAuth: Boolean(source.rememberAuth),
     provider,
@@ -128,6 +131,9 @@ function normalizeImportedProfile(rawProfile, index) {
     productDir: String(rawProfile.productDir || '').trim(),
     login: String(rawProfile.login || '').trim(),
     licenseKey: String(rawProfile.licenseKey || '').trim(),
+    password: String(rawProfile.password || '').trim(),
+    inibuildsProductId: Number(rawProfile.inibuildsProductId || 0),
+    inibuildsProductName: String(rawProfile.inibuildsProductName || '').trim(),
     packageVersion: Number(rawProfile.packageVersion || 0),
     rememberAuth: Boolean(rawProfile.rememberAuth),
     provider: UPDATE_PROVIDERS.has(String(rawProfile.provider || '').trim().toLowerCase())
@@ -142,11 +148,28 @@ function normalizeImportedProfile(rawProfile, index) {
   }
 
   const warnings = [];
-  if (profile.rememberAuth && (!profile.login || !profile.licenseKey)) {
+  if (profile.rememberAuth && !profile.login) {
     profile.rememberAuth = false;
     profile.login = '';
     profile.licenseKey = '';
-    warnings.push(`Entry ${index + 1}: rememberAuth disabled because login/license key is missing.`);
+    profile.password = '';
+    warnings.push(`Entry ${index + 1}: rememberAuth disabled because login is missing.`);
+  }
+
+  if (profile.rememberAuth && profile.provider === 'xupdater' && !profile.licenseKey) {
+    profile.rememberAuth = false;
+    profile.login = '';
+    profile.licenseKey = '';
+    profile.password = '';
+    warnings.push(`Entry ${index + 1}: rememberAuth disabled because license key is missing for xupdater.`);
+  }
+
+  if (profile.rememberAuth && profile.provider === 'inibuilds' && !profile.password && !profile.licenseKey) {
+    profile.rememberAuth = false;
+    profile.login = '';
+    profile.licenseKey = '';
+    profile.password = '';
+    warnings.push(`Entry ${index + 1}: rememberAuth disabled because password is missing for inibuilds.`);
   }
 
   return {
@@ -562,6 +585,30 @@ function createMainWindow() {
     }
   });
 
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    logger.warn('Renderer console message', {
+      level,
+      message: String(message || '').slice(0, 2000),
+      line,
+      sourceId: String(sourceId || '').slice(0, 200)
+    });
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logger.error('Renderer process gone', {
+      reason: details && details.reason,
+      exitCode: details && details.exitCode
+    });
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    logger.error('Renderer failed to load', {
+      errorCode,
+      errorDescription,
+      url: validatedURL
+    });
+  });
+
   mainWindow.loadFile(path.join(__dirname, 'src/index.html'));
 
   mainWindow.on('closed', () => {
@@ -620,7 +667,16 @@ function registerIpcHandlers() {
 
   const getUpdateProvider = (profile) => {
     const providerRaw = String(profile && profile.provider ? profile.provider : '').trim().toLowerCase();
-    return UPDATE_PROVIDERS.has(providerRaw) ? providerRaw : 'xupdater';
+    if (UPDATE_PROVIDERS.has(providerRaw)) {
+      return providerRaw;
+    }
+
+    const host = String(profile && profile.host ? profile.host : '').trim().toLowerCase();
+    if (/(^|\.)inibuilds\.com(?=$|\/)|manager\.inibuilds\.com/.test(host)) {
+      return 'inibuilds';
+    }
+
+    return 'xupdater';
   };
 
   const getUpdaterClientForProfile = (profile) => {
@@ -644,33 +700,49 @@ function registerIpcHandlers() {
       : {};
     const requestLogin = String(credentials.login || '').trim();
     const requestLicenseKey = String(credentials.licenseKey || '').trim();
+    const requestPassword = String(credentials.password || '').trim();
 
-    if (profile.credentialsUnavailable && (!requestLogin || !requestLicenseKey)) {
+    if (profile.credentialsUnavailable && !requestLogin) {
       throw new Error(
-        'Stored credentials could not be decrypted. Please re-enter login and license key in the profile and save again.'
+        'Stored credentials could not be decrypted. Please re-enter credentials in the profile and save again.'
       );
     }
 
     const login = requestLogin || String(profile.login || '').trim();
     const licenseKey = requestLicenseKey || String(profile.licenseKey || '').trim();
+    const password = requestPassword || String(profile.password || '').trim();
+    const provider = getUpdateProvider(profile);
 
-    if (!login || !licenseKey) {
+    if (!login) {
       throw new Error(
-        'Login and license key are missing. Enter them in the form or enable "Store credentials in profile".'
+        'Login is missing. Enter credentials in the form or enable "Store credentials in profile".'
+      );
+    }
+
+    if (provider === 'xupdater' && !licenseKey) {
+      throw new Error(
+        'License key is missing. Enter it in the form or enable "Store credentials in profile".'
+      );
+    }
+
+    if (provider === 'inibuilds' && !password && !licenseKey) {
+      throw new Error(
+        'Password is missing for iniBuilds. Enter it in the form or enable "Store credentials in profile".'
       );
     }
 
     return {
       ...profile,
       login,
-      licenseKey
+      licenseKey,
+      password
     };
   };
 
   const mapUpdaterError = (error) => {
     if (error instanceof UpdateHttpError && error.status === 401) {
       return new Error(
-        'Authentication failed (HTTP 401). Please verify login/license key and save the profile again.'
+        'Authentication failed (HTTP 401). Please verify your credentials and save the profile again.'
       );
     }
     return error;
@@ -929,7 +1001,15 @@ function registerIpcHandlers() {
     const profile = await profileStore.getProfile(profileId);
     const runtimeProfile = buildRuntimeProfileWithCredentials(profile, payload);
     const options = sanitizeCheckOptions(payload.options);
-    const updaterClient = getUpdaterClientForProfile(profile);
+    const provider = getUpdateProvider(runtimeProfile);
+    const updaterClient = getUpdaterClientForProfile(runtimeProfile);
+
+    logger.info('updates:check routing', {
+      profileId,
+      profileName: String(runtimeProfile.name || ''),
+      provider,
+      host: String(runtimeProfile.host || '').trim()
+    });
 
     try {
       return await updaterClient.createUpdatePlan(runtimeProfile, options);
@@ -1112,6 +1192,9 @@ app.whenReady().then(() => {
       baseUrl: process.env.AEROSYNC_INIBUILDS_BASE_URL,
       authPath: process.env.AEROSYNC_INIBUILDS_AUTH_PATH,
       productsPath: process.env.AEROSYNC_INIBUILDS_PRODUCTS_PATH,
+      filesUrlPath: process.env.AEROSYNC_INIBUILDS_FILES_URL_PATH,
+      shopifyApiUrl: process.env.AEROSYNC_INIBUILDS_SHOPIFY_API_URL,
+      shopifyApiToken: process.env.AEROSYNC_INIBUILDS_SHOPIFY_API_TOKEN,
       timeoutMs: process.env.AEROSYNC_INIBUILDS_TIMEOUT_MS
     })
   };
