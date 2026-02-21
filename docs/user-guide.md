@@ -11,6 +11,7 @@ Fields:
 - `Product Directory`: base folder of the product on disk
 - `Login / Email`: account login for the updater service
 - `License Key`: license key for the product
+- `Update provider`: currently `X-Updater`; `iniBuilds` is prepared in profile data model for future native integration
 - `Release Channel`: `release`, `beta`, or `alpha`
 - `Snapshot number (since)`: baseline snapshot for incremental checks
 - `Ignore list`: paths or patterns to skip during plan/install (one per line)
@@ -115,6 +116,12 @@ Additional menu actions (top bar):
 - `File -> Import Profiles...`: load profiles from a JSON export
 - `File -> Export Profiles...`: export all current profiles to JSON
 - `Actions -> Export Diagnostics...`: export a diagnostics JSON (runtime + anonymized profile summary + current UI log)
+
+## Provider Support
+
+- `X-Updater` is fully supported for check/install/rollback.
+- `iniBuilds` can already be selected and stored in profiles as groundwork for a future native provider implementation.
+- When `iniBuilds` is selected, update actions currently show a clear "not implemented yet" message.
 
 ## App Update Checker
 

@@ -45,6 +45,23 @@ Actions:
 2. open `https://github.com/NichSchlagen/aerosync-addon-updater/releases` manually
 3. compare your installed version chip (`vX.Y.Z`) with the latest release tag
 
+## "Provider Not Implemented" Message
+
+Symptoms:
+
+- check or rollback shows a message that the selected provider is not implemented yet
+
+Cause:
+
+- profile is set to `iniBuilds` (foundation mode)
+
+Actions:
+
+1. open profile settings
+2. switch `Update provider` to `X-Updater`
+3. save profile
+4. run `Check Updates` again
+
 ## Profile Import Failed
 
 Symptoms:

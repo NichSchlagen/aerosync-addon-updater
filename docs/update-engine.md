@@ -1,5 +1,15 @@
 # How The Update Engine Works
 
+## Provider Routing
+
+Each profile stores an update `provider`.
+
+- default: `xupdater`
+- prepared for future extension: `inibuilds`
+
+At runtime, IPC handlers resolve the provider from the profile and route `check`, `install`, and `rollback` operations to the matching provider client.
+Currently only `xupdater` is implemented.
+
 ## 1) Authentication
 
 The app authenticates against:

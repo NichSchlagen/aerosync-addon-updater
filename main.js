@@ -11,9 +11,10 @@ const { createLogger } = require('./lib/logger');
 let mainWindow;
 let profileStore;
 let languageStore;
-let updaterClient;
+let updaterClients;
 let activeInstall = null;
 const logger = createLogger('main');
+const UPDATE_PROVIDERS = new Set(['xupdater', 'inibuilds']);
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -80,6 +81,9 @@ function resolveExportDirectory() {
 
 function normalizeProfileForExport(profile) {
   const source = profile && typeof profile === 'object' ? profile : {};
+  const providerRaw = String(source.provider || '').trim().toLowerCase();
+  const provider = UPDATE_PROVIDERS.has(providerRaw) ? providerRaw : 'xupdater';
+
   return {
     id: String(source.id || '').trim(),
     name: String(source.name || '').trim(),
@@ -89,6 +93,7 @@ function normalizeProfileForExport(profile) {
     licenseKey: String(source.licenseKey || '').trim(),
     packageVersion: Number(source.packageVersion || 0),
     rememberAuth: Boolean(source.rememberAuth),
+    provider,
     channel: String(source.channel || 'release').trim(),
     ignoreList: Array.isArray(source.ignoreList) ? source.ignoreList : []
   };
@@ -124,6 +129,9 @@ function normalizeImportedProfile(rawProfile, index) {
     licenseKey: String(rawProfile.licenseKey || '').trim(),
     packageVersion: Number(rawProfile.packageVersion || 0),
     rememberAuth: Boolean(rawProfile.rememberAuth),
+    provider: UPDATE_PROVIDERS.has(String(rawProfile.provider || '').trim().toLowerCase())
+      ? String(rawProfile.provider || '').trim().toLowerCase()
+      : 'xupdater',
     channel: String(rawProfile.channel || '').trim(),
     ignoreList: Array.isArray(rawProfile.ignoreList) ? rawProfile.ignoreList : []
   };
@@ -609,6 +617,26 @@ function registerIpcHandlers() {
     return normalized;
   };
 
+  const getUpdateProvider = (profile) => {
+    const providerRaw = String(profile && profile.provider ? profile.provider : '').trim().toLowerCase();
+    return UPDATE_PROVIDERS.has(providerRaw) ? providerRaw : 'xupdater';
+  };
+
+  const getUpdaterClientForProfile = (profile) => {
+    const provider = getUpdateProvider(profile);
+
+    if (provider === 'inibuilds') {
+      throw new Error('Update provider "iniBuilds" is not implemented yet.');
+    }
+
+    const client = updaterClients && updaterClients[provider];
+    if (!client) {
+      throw new Error(`Unsupported update provider: ${provider}`);
+    }
+
+    return client;
+  };
+
   const buildRuntimeProfileWithCredentials = (profile, requestPayload = {}) => {
     if (!profile) {
       throw new Error('Profile not found.');
@@ -904,6 +932,7 @@ function registerIpcHandlers() {
     const profile = await profileStore.getProfile(profileId);
     const runtimeProfile = buildRuntimeProfileWithCredentials(profile, payload);
     const options = sanitizeCheckOptions(payload.options);
+    const updaterClient = getUpdaterClientForProfile(profile);
 
     try {
       return await updaterClient.createUpdatePlan(runtimeProfile, options);
@@ -925,6 +954,7 @@ function registerIpcHandlers() {
     if (!profile) {
       throw new Error('Profile not found.');
     }
+    const updaterClient = getUpdaterClientForProfile(profile);
 
     const job = {
       senderId: event.sender.id,
@@ -1013,6 +1043,12 @@ function registerIpcHandlers() {
     const payload = assertObject('updates:rollback-info', request);
     const profileId = assertNonEmptyString('profileId', payload.profileId);
 
+    const profile = await profileStore.getProfile(profileId);
+    if (!profile) {
+      throw new Error('Profile not found.');
+    }
+
+    const updaterClient = getUpdaterClientForProfile(profile);
     return updaterClient.getRollbackInfo(profileId);
   });
 
@@ -1028,6 +1064,8 @@ function registerIpcHandlers() {
     if (!profile) {
       throw new Error('Profile not found.');
     }
+
+    const updaterClient = getUpdaterClientForProfile(profile);
 
     const result = await updaterClient.rollbackLatestSnapshot(profile);
     if (Number.isFinite(Number(result.sourceSnapshotNumber))) {
@@ -1066,10 +1104,12 @@ app.whenReady().then(() => {
       : null
   });
   languageStore = new LanguageStore(languageDir);
-  updaterClient = new UpdateClient({
-    tempDir: app.getPath('temp'),
-    snapshotDir: path.join(dataDir, 'install-snapshots')
-  });
+  updaterClients = {
+    xupdater: new UpdateClient({
+      tempDir: app.getPath('temp'),
+      snapshotDir: path.join(dataDir, 'install-snapshots')
+    })
+  };
 
   registerIpcHandlers();
   createMainWindow();

@@ -2,6 +2,7 @@ const DEFAULT_HOST = 'https://update.x-plane.org';
 const LANGUAGE_STORAGE_KEY = 'aerosync.language';
 const ACTION_TABLE_MAX_ROWS = 600;
 const ACTION_TABLE_PAGE_SIZES = [50, 100, 200, 300, 600];
+const UPDATE_PROVIDERS = new Set(['xupdater', 'inibuilds']);
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -63,6 +64,7 @@ const el = {
   packageVersion: document.getElementById('packageVersion'),
   rememberAuth: document.getElementById('rememberAuth'),
   channel: document.getElementById('channel'),
+  provider: document.getElementById('provider'),
 
   optFresh: document.getElementById('optFresh'),
   optRepair: document.getElementById('optRepair'),
@@ -202,6 +204,15 @@ function normalizeActionTablePageSize(value, fallback = 100) {
   }
 
   return Math.min(parsed, ACTION_TABLE_MAX_ROWS);
+}
+
+function normalizeProvider(value, fallback = 'xupdater') {
+  const provider = String(value || '').trim().toLowerCase();
+  if (UPDATE_PROVIDERS.has(provider)) {
+    return provider;
+  }
+
+  return fallback;
 }
 
 function getFilteredActions(actions) {
@@ -584,6 +595,7 @@ function collectProfileFromForm() {
     ignoreList: parseIgnoreListInput(el.ignoreList.value),
     packageVersion: Number(el.packageVersion.value || '0'),
     rememberAuth: el.rememberAuth.checked,
+    provider: normalizeProvider(el.provider.value, 'xupdater'),
     channel: String(el.channel.value || 'release')
   };
 }
@@ -597,8 +609,24 @@ function fillForm(profile) {
   el.ignoreList.value = formatIgnoreListOutput(profile?.ignoreList || []);
   el.packageVersion.value = Number(profile?.packageVersion || 0);
   el.rememberAuth.checked = Boolean(profile?.rememberAuth ?? true);
+  el.provider.value = normalizeProvider(profile?.provider, 'xupdater');
   el.channel.value = String(profile?.channel || 'release');
   syncFreshModeUi();
+}
+
+function ensureSelectedProviderAvailable() {
+  const selected = getSelectedProfile();
+  const provider = normalizeProvider(el.provider.value || selected?.provider, 'xupdater');
+  if (provider === 'xupdater') {
+    return true;
+  }
+
+  const providerLabel = provider === 'inibuilds'
+    ? t('provider.inibuilds')
+    : provider;
+  log(t('log.providerUnsupported', { provider: providerLabel }));
+  window.alert(t('alert.providerUnsupported', { provider: providerLabel }));
+  return false;
 }
 
 function resetSummary() {
@@ -847,6 +875,7 @@ async function ensureProfileSaved() {
     'ignoreList',
     'packageVersion',
     'rememberAuth',
+    'provider',
     'channel'
   ].some((key) => String(selected[key] ?? '') !== String(inForm[key] ?? ''));
 
@@ -879,6 +908,10 @@ function applyPlanToUi(planResult) {
 
 async function onCheckUpdates() {
   if (state.installRunning || state.rollbackRunning) {
+    return;
+  }
+
+  if (!ensureSelectedProviderAvailable()) {
     return;
   }
 
@@ -1160,6 +1193,10 @@ async function onRollbackLastInstall() {
     return;
   }
 
+  if (!ensureSelectedProviderAvailable()) {
+    return;
+  }
+
   if (!state.rollbackAvailable) {
     window.alert(t('alert.rollbackUnavailable'));
     return;
@@ -1299,6 +1336,7 @@ function buildDiagnosticsExportPayload() {
     return {
       id: String(profile.id || ''),
       host: String(profile.host || ''),
+      provider: normalizeProvider(profile.provider, 'xupdater'),
       channel: String(profile.channel || 'release'),
       packageVersion: Number(profile.packageVersion || 0),
       rememberAuth: Boolean(profile.rememberAuth),
