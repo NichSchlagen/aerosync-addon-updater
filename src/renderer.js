@@ -2062,6 +2062,7 @@ function wireEvents() {
     void handleMenuAction(action);
   });
 
+  let lastLoggedPercent = -1;
   window.aeroApi.onProgress((progress) => {
     updateProgressUi(progress);
     const msg = `${progress.index}/${progress.total} ${progress.message}`;
@@ -2069,7 +2070,22 @@ function wireEvents() {
       percent: el.progressPercent.textContent,
       message: msg
     }));
-    log(msg);
+
+    // During byte-level download progress (bytesTotal > 0) only log on percent change
+    // to avoid spamming the UI log with identical lines every 250 ms.
+    const bytesTotal = Number(progress.bytesTotal || 0);
+    const bytesDownloaded = Number(progress.bytesDownloaded || 0);
+    const hasByteProgress = bytesTotal > 0;
+    if (hasByteProgress) {
+      const currentPercent = el.progressPercent.textContent;
+      if (currentPercent !== lastLoggedPercent) {
+        lastLoggedPercent = currentPercent;
+        log(`${progress.message} — ${currentPercent} (${formatBytes(bytesDownloaded)} / ${formatBytes(bytesTotal)})`);
+      }
+    } else {
+      lastLoggedPercent = -1;
+      log(msg);
+    }
   });
 }
 
