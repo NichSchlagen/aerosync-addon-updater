@@ -8,7 +8,10 @@ Each profile stores an update `provider`.
 - prepared for future extension: `inibuilds`
 
 At runtime, IPC handlers resolve the provider from the profile and route `check`, `install`, and `rollback` operations to the matching provider client.
-Currently only `xupdater` is implemented.
+Current status:
+
+- `xupdater` -> fully implemented by `lib/update-client.js`
+- `inibuilds` -> dedicated client scaffold exists in `lib/inibuilds-client.js` (contract-compatible, logic pending)
 
 ## 1) Authentication
 

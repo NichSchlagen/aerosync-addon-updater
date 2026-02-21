@@ -120,7 +120,7 @@ Additional menu actions (top bar):
 ## Provider Support
 
 - `X-Updater` is fully supported for check/install/rollback.
-- `iniBuilds` can already be selected and stored in profiles as groundwork for a future native provider implementation.
+- `iniBuilds` is now wired as a dedicated provider client in the app architecture and can be selected/saved in profiles.
 - When `iniBuilds` is selected, update actions currently show a clear "not implemented yet" message.
 
 ## App Update Checker

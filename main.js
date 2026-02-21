@@ -5,6 +5,7 @@ const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = requir
 const { ProfileStore } = require('./lib/profile-store');
 const { LanguageStore } = require('./lib/language-store');
 const { UpdateClient, UpdateHttpError } = require('./lib/update-client');
+const { IniBuildsClient } = require('./lib/inibuilds-client');
 const { parseJsonSafe } = require('./lib/safe-json');
 const { createLogger } = require('./lib/logger');
 
@@ -625,10 +626,6 @@ function registerIpcHandlers() {
   const getUpdaterClientForProfile = (profile) => {
     const provider = getUpdateProvider(profile);
 
-    if (provider === 'inibuilds') {
-      throw new Error('Update provider "iniBuilds" is not implemented yet.');
-    }
-
     const client = updaterClients && updaterClients[provider];
     if (!client) {
       throw new Error(`Unsupported update provider: ${provider}`);
@@ -1106,6 +1103,10 @@ app.whenReady().then(() => {
   languageStore = new LanguageStore(languageDir);
   updaterClients = {
     xupdater: new UpdateClient({
+      tempDir: app.getPath('temp'),
+      snapshotDir: path.join(dataDir, 'install-snapshots')
+    }),
+    inibuilds: new IniBuildsClient({
       tempDir: app.getPath('temp'),
       snapshotDir: path.join(dataDir, 'install-snapshots')
     })
