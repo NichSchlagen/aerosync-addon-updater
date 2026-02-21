@@ -12,6 +12,8 @@ Fields:
 - `Profile Name`: free label in the sidebar
 - `Update Host`: default is `https://update.x-plane.org`
 - `Product Directory`: base folder of the product on disk
+  - **X-Updater**: path to the aircraft folder (e.g. `/home/user/X-Plane 12/Aircraft/MyAircraft`)
+  - **iniBuilds**: path to the **X-Plane root** folder (e.g. `/home/user/X-Plane 12`). The iniBuilds ZIP already contains relative paths starting with `Aircraft/...`, so the app extracts files into the correct subfolder automatically. Do **not** point this to an aircraft subfolder.
 - `Login / Email`: account login for the updater service
 - `License Key`: license key for the product
 - `Password (iniBuilds)`: account password for iniBuilds login flow

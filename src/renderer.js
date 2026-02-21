@@ -885,6 +885,12 @@ function syncProviderFields(options = {}) {
 
   syncIniBuildsActivationKeyUi();
 
+  // Swap productDir placeholder based on provider.
+  if (el.productDir) {
+    const phKey = isIniBuilds ? 'placeholder.productDir.inibuilds' : 'placeholder.productDir';
+    el.productDir.setAttribute('placeholder', t(phKey));
+  }
+
   el.licenseKey.disabled = isIniBuilds;
   el.password.disabled = !isIniBuilds;
   if (isIniBuilds) {

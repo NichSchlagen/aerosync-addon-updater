@@ -79,7 +79,9 @@ Artifacts are generated in `dist/`.
 ## First App Setup
 
 1. Create a new profile and choose the update provider (`X-Updater` or `iniBuilds`).
-2. Set product directory to your aircraft folder.
+2. Set product directory:
+   - **X-Updater**: point to the aircraft folder (e.g. `/home/user/X-Plane 12/Aircraft/MyAircraft`).
+   - **iniBuilds**: point to your **X-Plane root** folder (e.g. `/home/user/X-Plane 12`). The iniBuilds ZIP already contains paths starting with `Aircraft/...` so files are placed correctly automatically.
 3. For X-Updater: enter login/email and license key. For iniBuilds: enter login/email and password.
 4. Pick a channel (`release`, `beta`, or `alpha`).
 5. For X-Updater: keep `Snapshot number (since)` at your last installed snapshot (or `0` if unknown).
