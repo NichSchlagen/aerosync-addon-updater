@@ -317,6 +317,7 @@ h3 {
   gap: 6px;
   font-size: 0.8rem;
   color: var(--text-light);
+  min-width: 0;
 }
 
 .form-grid label.full-row {
@@ -335,7 +336,7 @@ h3 {
   gap: 8px;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   border: 1px solid var(--border-color-light);
@@ -345,6 +346,8 @@ textarea {
   color: var(--text-color);
   outline: none;
   transition: border-color 130ms ease, box-shadow 130ms ease;
+  min-width: 0;
+  width: 100%;
 }
 
 input::placeholder,
@@ -359,6 +362,9 @@ select {
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat, no-repeat;
   padding-right: 34px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 textarea {
@@ -368,7 +374,7 @@ textarea {
   line-height: 1.35;
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   border-color: #3b82f6;
@@ -502,6 +508,10 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
+}
+
+.summary-grid[data-columns="4"] {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .summary-card {

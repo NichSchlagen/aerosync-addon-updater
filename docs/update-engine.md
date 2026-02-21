@@ -1,5 +1,30 @@
 # How The Update Engine Works
 
+## Provider Routing
+
+Each profile stores an update `provider`.
+
+- default: `xupdater`
+- supported: `inibuilds`
+
+At runtime, IPC handlers resolve the provider from the profile and route `check`, `install`, and `rollback` operations to the matching provider client.
+Current status:
+
+- `xupdater` -> fully implemented by `lib/update-client.js`
+- `inibuilds` -> dedicated client exists in `lib/inibuilds-client.js`
+  - implemented: auth via two-stage Shopify storefront token exchange (`customerAccessTokenCreate`) + iniBuilds device-ID registration (`POST /api/v4/login` with `{accessToken}` → `{token: deviceId}`)
+  - implemented: product-list probe via `POST /api/v4/companies` (Authorization header: bare `deviceId`, no Bearer prefix)
+  - implemented: `filesUrl` probe → response contains signed download URL, filename, `filesIntegrityHash`, `cacheTime`
+  - implemented: per-file plan creation by reading ZIP central directory (HTTP range) and comparing file CRC32/size vs local files
+  - implemented: `installPlan` verifies MD5 (`filesIntegrityHash`, with base64/gzip/gunzip normalization fallbacks) and extracts only the planned ZIP entries
+  - implemented: rollback snapshot handling (local pre-install backup of changed/deleted files)
+  - implemented: safe delete detection based on a local iniBuilds manifest from the last successful install
+  - implemented: owned-product extraction from companies response with activation-key discovery via `orders[].OrderProduct.drm_key` (confirmed from live API)
+  - implemented: activation key persistence in profile storage (available without re-checking)
+  - endpoint paths are configurable via environment variables (`AEROSYNC_INIBUILDS_*`), including `AEROSYNC_INIBUILDS_FILES_URL_PATH`, `AEROSYNC_INIBUILDS_SHOPIFY_API_URL`, `AEROSYNC_INIBUILDS_SHOPIFY_API_TOKEN`
+  - Shopify storefront defaults are wired from renderer analysis evidence (`b17f49a46527a923b9ba9b7b67db1df4`); environment variables override them when set
+  - reference: [iniManager Renderer API Analysis](./inibuilds-renderer-api-analysis.md)
+
 ## 1) Authentication
 
 The app authenticates against:

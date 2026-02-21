@@ -7,6 +7,7 @@ This folder contains complete documentation for users and contributors.
 - [Getting Started](./getting-started.md)
 - [User Guide](./user-guide.md)
 - [How The Update Engine Works](./update-engine.md)
+- [iniManager Renderer API Analysis](./inibuilds-renderer-api-analysis.md)
 - [Data, Storage, and Security](./data-and-security.md)
 - [CI/CD and Release Flow](./ci-release.md)
 - [Troubleshooting](./troubleshooting.md)

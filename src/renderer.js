@@ -1,7 +1,13 @@
 const DEFAULT_HOST = 'https://update.x-plane.org';
+const INIBUILDS_DEFAULT_HOST = 'https://manager.inibuilds.com';
+const PROVIDER_DEFAULT_HOSTS = Object.freeze({
+  xupdater: DEFAULT_HOST,
+  inibuilds: INIBUILDS_DEFAULT_HOST
+});
 const LANGUAGE_STORAGE_KEY = 'aerosync.language';
 const ACTION_TABLE_MAX_ROWS = 600;
 const ACTION_TABLE_PAGE_SIZES = [50, 100, 200, 300, 600];
+const UPDATE_PROVIDERS = new Set(['xupdater', 'inibuilds']);
 
 const MENU_ACTIONS = Object.freeze({
   PROFILE_NEW: 'profile:new',
@@ -20,11 +26,13 @@ const MENU_ACTIONS = Object.freeze({
 });
 
 let lastMenuStateSnapshot = '';
+let lastProviderHostMismatchKey = '';
 
 const state = {
   profiles: [],
   selectedProfileId: null,
   currentPlan: null,
+  inibuildsProducts: [],
   optionalPackageSelection: {},
   actionTable: {
     query: '',
@@ -59,10 +67,21 @@ const el = {
   productDir: document.getElementById('productDir'),
   login: document.getElementById('login'),
   licenseKey: document.getElementById('licenseKey'),
+  password: document.getElementById('password'),
+  fieldLoginWrap: document.getElementById('fieldLoginWrap'),
+  fieldLicenseKeyWrap: document.getElementById('fieldLicenseKeyWrap'),
+  fieldPasswordWrap: document.getElementById('fieldPasswordWrap'),
+  fieldIniBuildsProductWrap: document.getElementById('fieldIniBuildsProductWrap'),
+  fieldSinceWrap: document.getElementById('fieldSinceWrap'),
+  fieldIniBuildsActivationKeyWrap: document.getElementById('fieldIniBuildsActivationKeyWrap'),
+  inibuildsProductId: document.getElementById('inibuildsProductId'),
+  inibuildsActivationKey: document.getElementById('inibuildsActivationKey'),
+  btnCopyIniBuildsActivationKey: document.getElementById('btnCopyIniBuildsActivationKey'),
   ignoreList: document.getElementById('ignoreList'),
   packageVersion: document.getElementById('packageVersion'),
   rememberAuth: document.getElementById('rememberAuth'),
   channel: document.getElementById('channel'),
+  provider: document.getElementById('provider'),
 
   optFresh: document.getElementById('optFresh'),
   optRepair: document.getElementById('optRepair'),
@@ -80,11 +99,14 @@ const el = {
   btnClearLog: document.getElementById('btnClearLog'),
 
   runStatus: document.getElementById('runStatus'),
+  summaryGrid: document.getElementById('summaryGrid'),
+  sumSnapshotCard: document.getElementById('sumSnapshotCard'),
   sumSnapshot: document.getElementById('sumSnapshot'),
   sumFiles: document.getElementById('sumFiles'),
   sumDownload: document.getElementById('sumDownload'),
   sumDisk: document.getElementById('sumDisk'),
   sumWarnings: document.getElementById('sumWarnings'),
+  optionalPackagesPanel: document.getElementById('optionalPackagesPanel'),
   optionalPackageCount: document.getElementById('optionalPackageCount'),
   optionalPackagesEmpty: document.getElementById('optionalPackagesEmpty'),
   optionalPackagesList: document.getElementById('optionalPackagesList'),
@@ -202,6 +224,15 @@ function normalizeActionTablePageSize(value, fallback = 100) {
   }
 
   return Math.min(parsed, ACTION_TABLE_MAX_ROWS);
+}
+
+function normalizeProvider(value, fallback = 'xupdater') {
+  const provider = String(value || '').trim().toLowerCase();
+  if (UPDATE_PROVIDERS.has(provider)) {
+    return provider;
+  }
+
+  return fallback;
 }
 
 function getFilteredActions(actions) {
@@ -457,15 +488,31 @@ function resetProgressUi() {
 function updateProgressUi(progress) {
   const total = Number(progress.total || 0);
   const index = Number(progress.index || 0);
-  const percent = total > 0 ? Math.max(0, Math.min(100, Math.round((index / total) * 100))) : 0;
+  const bytesTotal = Number(progress.bytesTotal || 0);
+  const bytesDownloaded = Number(progress.bytesDownloaded || 0);
+  const hasByteProgress = bytesTotal > 0 && bytesDownloaded >= 0;
+  const percent = hasByteProgress
+    ? Math.max(0, Math.min(100, Math.round((bytesDownloaded / bytesTotal) * 100)))
+    : total > 0
+      ? Math.max(0, Math.min(100, Math.round((index / total) * 100)))
+      : 0;
+  const message = String(progress.message || '').trim();
 
   el.progressFill.style.width = `${percent}%`;
   el.progressPercent.textContent = `${percent}%`;
-  el.progressMeta.textContent = t('progress.meta', { index, total });
-  el.progressLabel.textContent = progress.type === 'delete'
-    ? t('progress.deletingFiles')
-    : t('progress.installingFiles');
-  el.progressFile.textContent = progress.path || progress.message || '-';
+  el.progressMeta.textContent = hasByteProgress
+    ? t('progress.metaBytes', { downloaded: formatBytes(bytesDownloaded), total: formatBytes(bytesTotal) })
+    : t('progress.meta', { index, total });
+  if (/^DOWNLOAD\b/i.test(message)) {
+    el.progressLabel.textContent = t('progress.downloadingPackage');
+  } else if (/^VERIFY\b/i.test(message)) {
+    el.progressLabel.textContent = t('progress.verifyingPackage');
+  } else {
+    el.progressLabel.textContent = progress.type === 'delete'
+      ? t('progress.deletingFiles')
+      : t('progress.installingFiles');
+  }
+  el.progressFile.textContent = progress.path || message || '-';
 }
 
 function syncNativeMenuState() {
@@ -506,6 +553,7 @@ function syncActionButtons() {
   el.btnSaveProfile.disabled = lockProfileUi;
   el.btnDeleteProfile.disabled = lockProfileUi;
   el.btnPickDir.disabled = lockProfileUi;
+  el.provider.disabled = lockProfileUi;
   el.languageSelect.disabled = lockProfileUi || state.i18n.languages.length === 0;
   el.btnPause.textContent = state.installPaused ? t('btn.resume') : t('btn.pause');
   el.profileList.classList.toggle('blocked', lockProfileUi);
@@ -537,11 +585,13 @@ async function refreshRollbackInfo(profileId = '') {
 }
 
 function syncFreshModeUi() {
+  const provider = normalizeProvider(el.provider.value, 'xupdater');
+  const isIniBuilds = provider === 'inibuilds';
   const isFresh = Boolean(el.optFresh.checked);
   const isRepair = Boolean(el.optRepair.checked);
   const ignoreSince = isFresh || isRepair;
 
-  el.packageVersion.disabled = ignoreSince;
+  el.packageVersion.disabled = isIniBuilds || ignoreSince;
   el.packageVersion.title = isFresh
     ? t('tooltip.freshSince')
     : isRepair
@@ -573,7 +623,291 @@ function getSelectedProfile() {
   return state.profiles.find((item) => item.id === state.selectedProfileId) || null;
 }
 
+function getDefaultHostForProvider(provider) {
+  const normalized = normalizeProvider(provider, 'xupdater');
+  return PROVIDER_DEFAULT_HOSTS[normalized] || DEFAULT_HOST;
+}
+
+function isKnownProviderDefaultHost(host) {
+  const value = String(host || '').trim();
+  return Object.values(PROVIDER_DEFAULT_HOSTS).includes(value);
+}
+
+function guessProviderFromHost(host) {
+  const value = String(host || '').trim().toLowerCase();
+  if (/(^|\.)inibuilds\.com(?=$|\/)|manager\.inibuilds\.com/.test(value)) {
+    return 'inibuilds';
+  }
+  return 'xupdater';
+}
+
+function maybeWarnProviderHostMismatch() {
+  const provider = normalizeProvider(el.provider.value, 'xupdater');
+  const host = String(el.host.value || '').trim();
+  if (!host) {
+    return;
+  }
+
+  const guessed = guessProviderFromHost(host);
+  if (!guessed || guessed === provider) {
+    lastProviderHostMismatchKey = '';
+    return;
+  }
+
+  const key = `${provider}::${guessed}::${host}`;
+  if (key === lastProviderHostMismatchKey) {
+    return;
+  }
+  lastProviderHostMismatchKey = key;
+
+  const expectedLabel = guessed === 'inibuilds'
+    ? t('provider.inibuilds')
+    : t('provider.xupdater');
+
+  log(t('log.hintPrefix', {
+    message: t('hint.providerHostMismatch', { expected: expectedLabel })
+  }));
+}
+
+function setWrapVisible(wrap, visible) {
+  if (!wrap) {
+    return;
+  }
+
+  wrap.hidden = !visible;
+  wrap.style.display = visible ? '' : 'none';
+}
+
+function truncateText(text, maxLen) {
+  const raw = String(text || '');
+  const max = Number.isFinite(Number(maxLen)) ? Math.max(10, Math.trunc(Number(maxLen))) : 60;
+  if (raw.length <= max) {
+    return raw;
+  }
+  return `${raw.slice(0, Math.max(0, max - 1)).trimEnd()}…`;
+}
+
+function buildIniBuildsOptionLabel(name, id) {
+  const safeId = String(id || '').trim();
+  const safeName = String(name || '').trim();
+  const suffix = safeId ? ` (#${safeId})` : '';
+
+  if (!safeName) {
+    return suffix ? suffix.trim() : '';
+  }
+
+  const maxLen = 60;
+  const available = Math.max(10, maxLen - suffix.length);
+  const trimmedName = truncateText(safeName, available);
+  return `${trimmedName}${suffix}`;
+}
+
+function setSelectOptions(select, items, selectedValue, selectedName = '') {
+  if (!select) {
+    return;
+  }
+
+  const selected = String(selectedValue || '0');
+  const savedName = String(selectedName || '').trim();
+  const safeItems = Array.isArray(items) ? items : [];
+  const options = [];
+
+  options.push(`<option value="0">${escapeHtml(t('placeholder.inibuildsProduct'))}</option>`);
+
+  const hasSelectedInItems = selected !== '0' && safeItems.some((item) => String(item && item.id ? item.id : '').trim() === selected);
+  if (selected !== '0' && !hasSelectedInItems) {
+    const savedLabel = savedName
+      ? t('placeholder.inibuildsProductSavedNamed', { id: selected, name: savedName })
+      : t('placeholder.inibuildsProductSaved', { id: selected });
+    options.push(
+      `<option value="${escapeHtml(selected)}" selected>${escapeHtml(truncateText(savedLabel, 60))}</option>`
+    );
+  }
+
+  for (const item of safeItems) {
+    const id = String(item && item.id ? item.id : '').trim();
+    const name = String(item && item.name ? item.name : '').trim();
+    if (!id || id === '0') {
+      continue;
+    }
+
+    const label = name ? buildIniBuildsOptionLabel(name, id) : `#${id}`;
+    const isSelected = id === selected ? ' selected' : '';
+    options.push(`<option value="${escapeHtml(id)}"${isSelected}>${escapeHtml(label)}</option>`);
+  }
+
+  select.innerHTML = options.join('');
+  select.value = selected;
+}
+
+function isXPlaneIniBuildsProduct(item) {
+  const name = String(item && item.name ? item.name : '').toLowerCase();
+  return name.includes('xplane');
+}
+
+function filterIniBuildsProductsForUi(items) {
+  const safeItems = Array.isArray(items) ? items : [];
+  const provider = normalizeProvider(el.provider && el.provider.value ? el.provider.value : '', 'xupdater');
+  if (provider !== 'inibuilds') {
+    return safeItems;
+  }
+
+  return safeItems.filter(isXPlaneIniBuildsProduct);
+}
+
+function applyIniBuildsProductsFromPlan(planResult) {
+  const products = Array.isArray(planResult && planResult.inibuildsProducts)
+    ? planResult.inibuildsProducts
+    : [];
+
+  state.inibuildsProducts = filterIniBuildsProductsForUi(products);
+
+  const selectedProfile = getSelectedProfile();
+  const selectedId = Number(selectedProfile && selectedProfile.inibuildsProductId
+    ? selectedProfile.inibuildsProductId
+    : 0);
+  const selectedName = String(selectedProfile && selectedProfile.inibuildsProductName
+    ? selectedProfile.inibuildsProductName
+    : '').trim();
+  const formId = Number(el.inibuildsProductId && el.inibuildsProductId.value
+    ? el.inibuildsProductId.value
+    : 0);
+  const desired = formId > 0 ? formId : (selectedId > 0 ? selectedId : 0);
+  setSelectOptions(el.inibuildsProductId, state.inibuildsProducts, desired, selectedName);
+
+  syncIniBuildsActivationKeyUi();
+}
+
+function getIniBuildsProductNameById(id) {
+  const target = String(id || '').trim();
+  if (!target || target === '0') {
+    return '';
+  }
+
+  const fromList = Array.isArray(state.inibuildsProducts)
+    ? state.inibuildsProducts.find((item) => String(item && item.id ? item.id : '').trim() === target)
+    : null;
+  if (fromList && fromList.name) {
+    return String(fromList.name).trim();
+  }
+
+  const selectedProfile = getSelectedProfile();
+  const saved = String(selectedProfile && selectedProfile.inibuildsProductName
+    ? selectedProfile.inibuildsProductName
+    : '').trim();
+  return saved;
+}
+
+function getIniBuildsActivationKeyById(id) {
+  const target = String(id || '').trim();
+  if (!target || target === '0') {
+    return '';
+  }
+
+  // Primary: from the fetched product list (after check).
+  const fromList = Array.isArray(state.inibuildsProducts)
+    ? state.inibuildsProducts.find((item) => String(item && item.id ? item.id : '').trim() === target)
+    : null;
+  const key = fromList && (fromList.activationKey || fromList.productKey || fromList.key)
+    ? (fromList.activationKey || fromList.productKey || fromList.key)
+    : '';
+  if (key) {
+    return String(key).trim();
+  }
+
+  // Fallback: saved in profile (persisted from prior check).
+  const selectedProfile = getSelectedProfile();
+  const savedProductId = String(selectedProfile && selectedProfile.inibuildsProductId
+    ? selectedProfile.inibuildsProductId
+    : '').trim();
+  if (savedProductId === target && selectedProfile && selectedProfile.inibuildsActivationKey) {
+    return String(selectedProfile.inibuildsActivationKey).trim();
+  }
+
+  return '';
+}
+
+function syncIniBuildsActivationKeyUi() {
+  if (!el.fieldIniBuildsActivationKeyWrap || !el.inibuildsActivationKey) {
+    return;
+  }
+
+  const provider = normalizeProvider(el.provider.value, 'xupdater');
+  const isIniBuilds = provider === 'inibuilds';
+  if (!isIniBuilds) {
+    el.fieldIniBuildsActivationKeyWrap.hidden = true;
+    el.fieldIniBuildsActivationKeyWrap.style.display = 'none';
+    el.inibuildsActivationKey.value = '';
+    if (el.btnCopyIniBuildsActivationKey) {
+      el.btnCopyIniBuildsActivationKey.disabled = true;
+    }
+    return;
+  }
+
+  const selectedId = Number(el.inibuildsProductId && el.inibuildsProductId.value
+    ? el.inibuildsProductId.value
+    : 0);
+  const activationKey = getIniBuildsActivationKeyById(selectedId);
+  el.inibuildsActivationKey.value = activationKey;
+  // Always show the field for iniBuilds so users can see whether a key was loaded.
+  el.fieldIniBuildsActivationKeyWrap.hidden = false;
+  el.fieldIniBuildsActivationKeyWrap.style.display = '';
+  if (el.btnCopyIniBuildsActivationKey) {
+    el.btnCopyIniBuildsActivationKey.disabled = !activationKey;
+  }
+}
+
+function syncProviderFields(options = {}) {
+  const applyHostDefault = Boolean(options.applyHostDefault);
+  const forceHostDefault = Boolean(options.forceHostDefault);
+  const provider = normalizeProvider(el.provider.value, 'xupdater');
+  const isIniBuilds = provider === 'inibuilds';
+
+  // iniBuilds: users typically do not know/enter a license key; we fetch the activation/product key from backend.
+  setWrapVisible(el.fieldLicenseKeyWrap, !isIniBuilds);
+  setWrapVisible(el.fieldPasswordWrap, isIniBuilds);
+  setWrapVisible(el.fieldIniBuildsProductWrap, isIniBuilds);
+  setWrapVisible(el.fieldSinceWrap, !isIniBuilds);
+  // Visibility handled by syncIniBuildsActivationKeyUi() to avoid display/hidden desync.
+  if (el.sumSnapshotCard) {
+    el.sumSnapshotCard.hidden = isIniBuilds;
+  }
+  if (el.summaryGrid) {
+    if (isIniBuilds) {
+      el.summaryGrid.dataset.columns = '4';
+    } else {
+      delete el.summaryGrid.dataset.columns;
+    }
+  }
+  if (el.optionalPackagesPanel) {
+    el.optionalPackagesPanel.hidden = isIniBuilds;
+  }
+
+  syncIniBuildsActivationKeyUi();
+
+  el.licenseKey.disabled = isIniBuilds;
+  el.password.disabled = !isIniBuilds;
+  if (isIniBuilds) {
+    el.packageVersion.disabled = true;
+  }
+  if (el.inibuildsProductId) {
+    el.inibuildsProductId.disabled = !isIniBuilds;
+  }
+
+  const defaultHost = getDefaultHostForProvider(provider);
+  const currentHost = String(el.host.value || '').trim();
+  if (forceHostDefault || (applyHostDefault && (!currentHost || isKnownProviderDefaultHost(currentHost)))) {
+    el.host.value = defaultHost;
+  }
+
+  maybeWarnProviderHostMismatch();
+}
+
 function collectProfileFromForm() {
+  const inibuildsProductId = Number(el.inibuildsProductId && el.inibuildsProductId.value
+    ? el.inibuildsProductId.value
+    : 0);
+
   return {
     id: state.selectedProfileId,
     name: el.profileName.value.trim(),
@@ -581,24 +915,39 @@ function collectProfileFromForm() {
     productDir: el.productDir.value.trim(),
     login: el.login.value.trim(),
     licenseKey: el.licenseKey.value.trim(),
+    password: el.password.value.trim(),
+    inibuildsProductId,
+    inibuildsProductName: getIniBuildsProductNameById(inibuildsProductId),
+    inibuildsActivationKey: getIniBuildsActivationKeyById(inibuildsProductId),
     ignoreList: parseIgnoreListInput(el.ignoreList.value),
     packageVersion: Number(el.packageVersion.value || '0'),
     rememberAuth: el.rememberAuth.checked,
+    provider: normalizeProvider(el.provider.value, 'xupdater'),
     channel: String(el.channel.value || 'release')
   };
 }
 
 function fillForm(profile) {
   el.profileName.value = profile?.name || '';
-  el.host.value = profile?.host || DEFAULT_HOST;
+  el.host.value = profile?.host || getDefaultHostForProvider(profile?.provider);
   el.productDir.value = profile?.productDir || '';
   el.login.value = profile?.login || '';
   el.licenseKey.value = profile?.licenseKey || '';
+  el.password.value = profile?.password || '';
+  if (el.inibuildsProductId) {
+    const desired = Number(profile?.inibuildsProductId || 0);
+    const desiredName = String(profile?.inibuildsProductName || '').trim();
+    setSelectOptions(el.inibuildsProductId, filterIniBuildsProductsForUi(state.inibuildsProducts), desired, desiredName);
+  }
   el.ignoreList.value = formatIgnoreListOutput(profile?.ignoreList || []);
   el.packageVersion.value = Number(profile?.packageVersion || 0);
   el.rememberAuth.checked = Boolean(profile?.rememberAuth ?? true);
+  el.provider.value = normalizeProvider(profile?.provider, 'xupdater');
   el.channel.value = String(profile?.channel || 'release');
+  syncProviderFields();
   syncFreshModeUi();
+  // Show saved activation key immediately (before any check).
+  syncIniBuildsActivationKeyUi();
 }
 
 function resetSummary() {
@@ -806,8 +1155,10 @@ async function saveProfile() {
     ? null
     : {
         login: profile.login,
-        licenseKey: profile.licenseKey
+        licenseKey: profile.licenseKey,
+        password: profile.password
       };
+
   const result = await window.aeroApi.saveProfile(profile);
   state.profiles = result.allProfiles;
   state.selectedProfileId = result.profile.id;
@@ -816,6 +1167,7 @@ async function saveProfile() {
   if (transientCredentials) {
     el.login.value = transientCredentials.login;
     el.licenseKey.value = transientCredentials.licenseKey;
+    el.password.value = transientCredentials.password;
     el.rememberAuth.checked = false;
   }
   el.selectedProfileName.textContent = result.profile.name;
@@ -825,7 +1177,8 @@ async function saveProfile() {
     return {
       ...result.profile,
       login: transientCredentials.login,
-      licenseKey: transientCredentials.licenseKey
+      licenseKey: transientCredentials.licenseKey,
+      password: transientCredentials.password
     };
   }
 
@@ -845,14 +1198,18 @@ async function ensureProfileSaved() {
     'host',
     'productDir',
     'ignoreList',
+    'inibuildsProductId',
+    'inibuildsProductName',
     'packageVersion',
     'rememberAuth',
+    'provider',
     'channel'
   ].some((key) => String(selected[key] ?? '') !== String(inForm[key] ?? ''));
 
   const authChanged = Boolean(inForm.rememberAuth) && (
     String(selected.login ?? '') !== String(inForm.login ?? '')
     || String(selected.licenseKey ?? '') !== String(inForm.licenseKey ?? '')
+    || String(selected.password ?? '') !== String(inForm.password ?? '')
   );
 
   if (changed || authChanged) {
@@ -864,7 +1221,19 @@ async function ensureProfileSaved() {
 
 function applyPlanToUi(planResult) {
   const sum = planResult.summary;
-  el.sumSnapshot.textContent = `${sum.snapshotType} #${sum.snapshotNumber}`;
+  const provider = normalizeProvider(el.provider.value, 'xupdater');
+  const isIniBuilds = provider === 'inibuilds' || String(sum && sum.snapshotType ? sum.snapshotType : '') === 'inibuilds';
+  if (el.sumSnapshotCard) {
+    el.sumSnapshotCard.hidden = isIniBuilds;
+  }
+  if (el.summaryGrid) {
+    if (isIniBuilds) {
+      el.summaryGrid.dataset.columns = '4';
+    } else {
+      delete el.summaryGrid.dataset.columns;
+    }
+  }
+  el.sumSnapshot.textContent = isIniBuilds ? '-' : `${sum.snapshotType} #${sum.snapshotNumber}`;
   el.sumFiles.textContent = t('summary.filesWithDelete', {
     fileCount: sum.fileCount,
     deleteCount: sum.deleteCount
@@ -873,7 +1242,14 @@ function applyPlanToUi(planResult) {
   el.sumDisk.textContent = formatBytes(sum.diskSize);
   const warnings = Array.isArray(planResult.warnings) ? planResult.warnings : [];
   el.sumWarnings.textContent = `${warnings.length}`;
-  renderOptionalPackages(planResult.optionalPackages || []);
+  if (el.optionalPackagesPanel) {
+    el.optionalPackagesPanel.hidden = isIniBuilds;
+  }
+  if (!isIniBuilds) {
+    renderOptionalPackages(planResult.optionalPackages || []);
+  } else {
+    renderOptionalPackages([]);
+  }
   renderActions(planResult.actions);
 }
 
@@ -910,9 +1286,12 @@ async function onCheckUpdates() {
       options,
       credentials: {
         login: el.login.value.trim(),
-        licenseKey: el.licenseKey.value.trim()
+        licenseKey: el.licenseKey.value.trim(),
+        password: el.password.value.trim()
       }
     });
+
+    applyIniBuildsProductsFromPlan(planResult);
     const optionalPackages = Array.isArray(planResult.optionalPackages)
       ? planResult.optionalPackages
       : [];
@@ -932,6 +1311,21 @@ async function onCheckUpdates() {
     el.progressLabel.textContent = t('progress.readyToInstall');
     el.progressMeta.textContent = t('progress.meta', { index: 0, total: planResult.actions.length || 0 });
     syncActionButtons();
+
+    const provider = normalizeProvider(el.provider.value, 'xupdater');
+    const selectedIniBuildsProductId = Number(el.inibuildsProductId && el.inibuildsProductId.value
+      ? el.inibuildsProductId.value
+      : 0);
+    if (
+      provider === 'inibuilds'
+      && (!Number.isFinite(selectedIniBuildsProductId) || selectedIniBuildsProductId <= 0)
+      && Array.isArray(planResult.inibuildsProducts)
+      && planResult.inibuildsProducts.length > 0
+      && (!planResult.actions || planResult.actions.length === 0)
+    ) {
+      setStatus(t('status.selectIniBuildsProduct'));
+      log(t('log.hintPrefix', { message: t('hint.inibuildsSelectProduct') }));
+    }
 
     const warnings = Array.isArray(planResult.warnings) ? planResult.warnings : [];
     if (warnings.length > 0) {
@@ -1023,22 +1417,31 @@ async function onInstallUpdates() {
     });
     setStatus(t('status.installCompleted'));
     log(t('log.installFinished', { updated: result.updated, deleted: result.deleted }));
-    log(t('log.newSnapshot', { number: result.snapshotNumber, type: result.snapshotType }));
-    const newSnapshotNumber = Number(result.snapshotNumber);
-    if (Number.isFinite(newSnapshotNumber) && newSnapshotNumber >= 0) {
-      const selectedIndex = state.profiles.findIndex((item) => item.id === state.currentPlan.profileId);
-      if (selectedIndex >= 0) {
-        state.profiles[selectedIndex].packageVersion = newSnapshotNumber;
+    const provider = normalizeProvider(el.provider.value, 'xupdater');
+    const isIniBuilds = provider === 'inibuilds' || String(result && result.snapshotType ? result.snapshotType : '') === 'inibuilds';
+    if (!isIniBuilds) {
+      log(t('log.newSnapshot', { number: result.snapshotNumber, type: result.snapshotType }));
+      const newSnapshotNumber = Number(result.snapshotNumber);
+      if (Number.isFinite(newSnapshotNumber) && newSnapshotNumber >= 0) {
+        const selectedIndex = state.profiles.findIndex((item) => item.id === state.currentPlan.profileId);
+        if (selectedIndex >= 0) {
+          state.profiles[selectedIndex].packageVersion = newSnapshotNumber;
+        }
+        el.packageVersion.value = newSnapshotNumber;
       }
-      el.packageVersion.value = newSnapshotNumber;
-    }
 
-    window.alert(t('alert.installCompleted', {
-      updated: result.updated,
-      deleted: result.deleted,
-      type: result.snapshotType,
-      number: result.snapshotNumber
-    }));
+      window.alert(t('alert.installCompleted', {
+        updated: result.updated,
+        deleted: result.deleted,
+        type: result.snapshotType,
+        number: result.snapshotNumber
+      }));
+    } else {
+      window.alert(t('alert.installCompletedNoSnapshot', {
+        updated: result.updated,
+        deleted: result.deleted
+      }));
+    }
 
     state.currentPlan = null;
     await refreshRollbackInfo();
@@ -1145,6 +1548,8 @@ function onCreateNewProfile() {
   state.currentPlan = null;
   resetOptionalPackages();
   fillForm(null);
+  el.provider.value = 'xupdater';
+  syncProviderFields({ forceHostDefault: true });
   el.selectedProfileName.textContent = t('profile.new');
   resetSummary();
   resetProgressUi();
@@ -1202,11 +1607,20 @@ async function onRollbackLastInstall() {
     }));
     log(t('log.runCheckAgain'));
 
-    window.alert(t('alert.rollbackCompleted', {
-      restored: Number(result.restored || 0),
-      removed: Number(result.removed || 0),
-      number: Number(result.sourceSnapshotNumber || 0)
-    }));
+    const provider = normalizeProvider(selected.provider || el.provider.value, 'xupdater');
+    const isIniBuilds = provider === 'inibuilds';
+    if (isIniBuilds) {
+      window.alert(t('alert.rollbackCompletedNoSnapshot', {
+        restored: Number(result.restored || 0),
+        removed: Number(result.removed || 0)
+      }));
+    } else {
+      window.alert(t('alert.rollbackCompleted', {
+        restored: Number(result.restored || 0),
+        removed: Number(result.removed || 0),
+        number: Number(result.sourceSnapshotNumber || 0)
+      }));
+    }
   } catch (error) {
     const message = String(error && error.message ? error.message : error);
     setStatus(t('status.rollbackError'));
@@ -1299,6 +1713,7 @@ function buildDiagnosticsExportPayload() {
     return {
       id: String(profile.id || ''),
       host: String(profile.host || ''),
+      provider: normalizeProvider(profile.provider, 'xupdater'),
       channel: String(profile.channel || 'release'),
       packageVersion: Number(profile.packageVersion || 0),
       rememberAuth: Boolean(profile.rememberAuth),
@@ -1570,6 +1985,32 @@ function wireEvents() {
   el.btnPickDir.addEventListener('click', () => {
     void onPickDirectoryClicked();
   });
+  el.provider.addEventListener('change', () => {
+    syncProviderFields({ applyHostDefault: true });
+  });
+
+  if (el.inibuildsProductId) {
+    el.inibuildsProductId.addEventListener('change', () => {
+      syncIniBuildsActivationKeyUi();
+    });
+  }
+
+  if (el.btnCopyIniBuildsActivationKey && el.inibuildsActivationKey) {
+    el.btnCopyIniBuildsActivationKey.addEventListener('click', async () => {
+      const value = String(el.inibuildsActivationKey.value || '').trim();
+      if (!value) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+        setStatus(t('status.copied'));
+        log(t('log.copiedToClipboard'));
+      } catch {
+        // Fallback: show value so user can copy manually.
+        window.prompt(t('prompt.copyManual'), value);
+      }
+    });
+  }
 
   el.languageSelect.addEventListener('change', async () => {
     try {
@@ -1645,6 +2086,7 @@ async function init() {
   renderActions([]);
   resetSummary();
   resetProgressUi();
+  syncProviderFields();
   syncFreshModeUi();
   syncActionButtons();
   setStatus(t('status.ready'));
