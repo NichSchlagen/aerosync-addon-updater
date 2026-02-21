@@ -614,21 +614,6 @@ function fillForm(profile) {
   syncFreshModeUi();
 }
 
-function ensureSelectedProviderAvailable() {
-  const selected = getSelectedProfile();
-  const provider = normalizeProvider(el.provider.value || selected?.provider, 'xupdater');
-  if (provider === 'xupdater') {
-    return true;
-  }
-
-  const providerLabel = provider === 'inibuilds'
-    ? t('provider.inibuilds')
-    : provider;
-  log(t('log.providerUnsupported', { provider: providerLabel }));
-  window.alert(t('alert.providerUnsupported', { provider: providerLabel }));
-  return false;
-}
-
 function resetSummary() {
   el.sumSnapshot.textContent = '-';
   el.sumFiles.textContent = '-';
@@ -911,10 +896,6 @@ async function onCheckUpdates() {
     return;
   }
 
-  if (!ensureSelectedProviderAvailable()) {
-    return;
-  }
-
   try {
     state.checkRunning = true;
     syncActionButtons();
@@ -1190,10 +1171,6 @@ function onCreateNewProfile() {
 async function onRollbackLastInstall() {
   const selected = getSelectedProfile();
   if (!selected || state.installRunning || state.checkRunning || state.rollbackRunning) {
-    return;
-  }
-
-  if (!ensureSelectedProviderAvailable()) {
     return;
   }
 

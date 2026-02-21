@@ -1108,7 +1108,11 @@ app.whenReady().then(() => {
     }),
     inibuilds: new IniBuildsClient({
       tempDir: app.getPath('temp'),
-      snapshotDir: path.join(dataDir, 'install-snapshots')
+      snapshotDir: path.join(dataDir, 'install-snapshots'),
+      baseUrl: process.env.AEROSYNC_INIBUILDS_BASE_URL,
+      authPath: process.env.AEROSYNC_INIBUILDS_AUTH_PATH,
+      productsPath: process.env.AEROSYNC_INIBUILDS_PRODUCTS_PATH,
+      timeoutMs: process.env.AEROSYNC_INIBUILDS_TIMEOUT_MS
     })
   };
 

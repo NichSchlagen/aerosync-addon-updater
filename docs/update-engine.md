@@ -11,7 +11,10 @@ At runtime, IPC handlers resolve the provider from the profile and route `check`
 Current status:
 
 - `xupdater` -> fully implemented by `lib/update-client.js`
-- `inibuilds` -> dedicated client scaffold exists in `lib/inibuilds-client.js` (contract-compatible, logic pending)
+- `inibuilds` -> dedicated client exists in `lib/inibuilds-client.js`
+  - implemented: auth request + product-list probe during `createUpdatePlan`
+  - pending: file plan creation, download/install pipeline, rollback snapshot handling
+  - endpoint paths are configurable via environment variables (`AEROSYNC_INIBUILDS_*`)
 
 ## 1) Authentication
 

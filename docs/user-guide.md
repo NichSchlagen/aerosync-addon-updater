@@ -121,7 +121,19 @@ Additional menu actions (top bar):
 
 - `X-Updater` is fully supported for check/install/rollback.
 - `iniBuilds` is now wired as a dedicated provider client in the app architecture and can be selected/saved in profiles.
-- When `iniBuilds` is selected, update actions currently show a clear "not implemented yet" message.
+- Current implementation step: `Check Updates` performs native API auth + product list probe and reports the result as warnings.
+- Native file plan/install for iniBuilds is not implemented yet.
+
+### iniBuilds Environment Overrides
+
+Optional environment variables for endpoint wiring:
+
+- `AEROSYNC_INIBUILDS_BASE_URL`
+- `AEROSYNC_INIBUILDS_AUTH_PATH` (default: `/api/auth/login`)
+- `AEROSYNC_INIBUILDS_PRODUCTS_PATH` (default: `/api/products`)
+- `AEROSYNC_INIBUILDS_TIMEOUT_MS` (default: `15000`)
+
+If no base URL environment variable is set, the profile `Update Host` is used.
 
 ## App Update Checker
 
