@@ -61,7 +61,7 @@
     "channel.release": "Release (stable)",
     "channel.beta": "Beta",
     "channel.alpha": "Alpha",
-    "provider.xupdater": "X-Updater (current)",
+    "provider.xupdater": "X-Updater",
     "provider.inibuilds": "iniBuilds",
     "status.ready": "Ready",
     "status.appUpdateChecking": "Checking app update ...",
