@@ -7,6 +7,8 @@ This folder contains complete documentation for users and contributors.
 - [Getting Started](./getting-started.md)
 - [User Guide](./user-guide.md)
 - [How The Update Engine Works](./update-engine.md)
+- [iniBuilds Discovery Guide (v2)](./inibuilds-discovery.md)
+- [iniBuilds Discovery Findings (v2)](./inibuilds-discovery-findings.md)
 - [Data, Storage, and Security](./data-and-security.md)
 - [CI/CD and Release Flow](./ci-release.md)
 - [Troubleshooting](./troubleshooting.md)
