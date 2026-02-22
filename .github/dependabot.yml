@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # npm dependencies (electron, electron-builder)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    reviewers:
+      - NichSchlagen
+    labels:
+      - dependencies
+    open-pull-requests-limit: 10
+
+  # GitHub Actions (checkout, setup-node, etc.)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    reviewers:
+      - NichSchlagen
+    labels:
+      - ci
+    open-pull-requests-limit: 5
