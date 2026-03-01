@@ -261,6 +261,23 @@ objects/custom.obj"></textarea>
       </section>
     </main>
 
+    <div id="releaseNotesModal" class="release-notes-modal" hidden>
+      <div id="releaseNotesBackdrop" class="release-notes-backdrop"></div>
+      <section class="release-notes-dialog" role="dialog" aria-modal="true" aria-labelledby="releaseNotesTitle">
+        <header class="release-notes-head">
+          <div>
+            <h3 id="releaseNotesTitle" data-i18n="panel.releaseNotes">Release Notes</h3>
+            <p id="releaseNotesMeta" class="release-notes-meta">-</p>
+          </div>
+          <button id="btnCloseReleaseNotes" class="btn btn-ghost" type="button" data-i18n="btn.close">Close</button>
+        </header>
+        <div id="releaseNotesContent" class="release-notes-content"></div>
+        <footer class="release-notes-foot">
+          <button id="btnOpenReleaseNotesPage" class="btn btn-primary" type="button" data-i18n="btn.openReleasePage">Open release page</button>
+        </footer>
+      </section>
+    </div>
+
     <script src="./renderer.js"></script>
   </body>
 </html>

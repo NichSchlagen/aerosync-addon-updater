@@ -46,6 +46,7 @@ const state = {
   rollbackAvailable: false,
   installPaused: false,
   appUpdateRunning: false,
+  releaseNotesUrl: '',
   i18n: {
     locale: 'en',
     localeTag: 'en-US',
@@ -90,6 +91,14 @@ const el = {
   btnNewProfile: document.getElementById('btnNewProfile'),
   btnDeleteProfile: document.getElementById('btnDeleteProfile'),
   btnCheckAppUpdate: document.getElementById('btnCheckAppUpdate'),
+  releaseNotesDialog: document.querySelector('.release-notes-dialog'),
+  releaseNotesModal: document.getElementById('releaseNotesModal'),
+  releaseNotesBackdrop: document.getElementById('releaseNotesBackdrop'),
+  releaseNotesTitle: document.getElementById('releaseNotesTitle'),
+  releaseNotesMeta: document.getElementById('releaseNotesMeta'),
+  releaseNotesContent: document.getElementById('releaseNotesContent'),
+  btnCloseReleaseNotes: document.getElementById('btnCloseReleaseNotes'),
+  btnOpenReleaseNotesPage: document.getElementById('btnOpenReleaseNotesPage'),
   btnSaveProfile: document.getElementById('btnSaveProfile'),
   btnPickDir: document.getElementById('btnPickDir'),
   btnCheck: document.getElementById('btnCheck'),
@@ -144,6 +153,150 @@ function formatVersionLabel(version) {
   }
 
   return /^v/i.test(raw) ? raw : `v${raw}`;
+}
+
+function formatPublishedAt(rawValue) {
+  const value = String(rawValue || '').trim();
+  if (!value) {
+    return t('releaseNotes.unknownDate');
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return t('releaseNotes.unknownDate');
+  }
+
+  try {
+    return new Intl.DateTimeFormat(state.i18n.localeTag || 'en-US', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
+}
+
+function sanitizeReleaseNotesHtml(input) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${String(input || '')}</div>`, 'text/html');
+  const root = doc.body.firstElementChild || doc.body;
+  const allowedTags = new Set([
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'ul', 'ol', 'li', 'blockquote', 'hr',
+    'pre', 'code', 'strong', 'em', 'b', 'i',
+    'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'br', 'del'
+  ]);
+
+  const walk = (node) => {
+    if (!node) {
+      return;
+    }
+
+    if (node.nodeType === Node.COMMENT_NODE) {
+      node.remove();
+      return;
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return;
+    }
+
+    const tagName = String(node.tagName || '').toLowerCase();
+    if (!allowedTags.has(tagName)) {
+      const replacement = doc.createTextNode(node.textContent || '');
+      node.replaceWith(replacement);
+      return;
+    }
+
+    const rawHref = tagName === 'a'
+      ? String(node.getAttribute('href') || '').trim()
+      : '';
+
+    for (const attr of Array.from(node.attributes)) {
+      node.removeAttribute(attr.name);
+    }
+
+    if (tagName === 'a') {
+      if (/^https?:\/\//i.test(rawHref)) {
+        node.setAttribute('href', rawHref);
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer');
+      }
+    }
+
+    for (const child of Array.from(node.childNodes)) {
+      walk(child);
+    }
+  };
+
+  for (const child of Array.from(root.childNodes)) {
+    walk(child);
+  }
+
+  return String(root.innerHTML || '').trim();
+}
+
+function buildReleaseNotesHtml(result) {
+  const html = sanitizeReleaseNotesHtml(result.releaseBodyHtml || '');
+  if (html) {
+    return html;
+  }
+
+  const markdown = String(result.releaseBody || '').trim();
+  if (!markdown) {
+    return `<p>${escapeHtml(t('releaseNotes.empty'))}</p>`;
+  }
+
+  return `<pre><code>${escapeHtml(markdown)}</code></pre>`;
+}
+
+function closeReleaseNotesModal() {
+  if (!el.releaseNotesModal) {
+    return;
+  }
+
+  el.releaseNotesModal.hidden = true;
+}
+
+function openReleaseNotesModal() {
+  if (!el.releaseNotesModal) {
+    return;
+  }
+
+  el.releaseNotesModal.hidden = false;
+}
+
+function renderReleaseNotesModal(result) {
+  if (!el.releaseNotesContent || !el.releaseNotesMeta || !el.btnOpenReleaseNotesPage) {
+    return;
+  }
+
+  state.releaseNotesUrl = String(result.releaseUrl || '').trim();
+
+  const latest = formatVersionLabel(result.latestVersion || '');
+  const current = formatVersionLabel(result.currentVersion || '');
+  const published = formatPublishedAt(result.publishedAt);
+  const hasNewVersion = String(result.status || '').trim().toLowerCase() === 'available';
+
+  if (el.releaseNotesDialog) {
+    el.releaseNotesDialog.classList.toggle('is-update-available', hasNewVersion);
+  }
+
+  if (el.releaseNotesTitle) {
+    el.releaseNotesTitle.textContent = hasNewVersion
+      ? t('panel.releaseNotesAvailable')
+      : t('panel.releaseNotes');
+  }
+
+  el.releaseNotesMeta.textContent = t('releaseNotes.meta', {
+    latest,
+    current,
+    published
+  });
+
+  el.releaseNotesContent.innerHTML = buildReleaseNotesHtml(result);
+  el.btnOpenReleaseNotesPage.disabled = !state.releaseNotesUrl;
 }
 
 function formatBytes(bytes) {
@@ -1524,15 +1677,8 @@ async function onCheckAppUpdate() {
         latest: result.latestVersion,
         current: result.currentVersion
       }));
-
-      const openRelease = window.confirm(t('confirm.openReleasePage', {
-        latest: result.latestVersion,
-        current: result.currentVersion
-      }));
-
-      if (openRelease) {
-        await window.aeroApi.openExternalUrl(result.releaseUrl);
-      }
+      renderReleaseNotesModal(result);
+      openReleaseNotesModal();
 
       return;
     }
@@ -2031,6 +2177,30 @@ function wireEvents() {
   el.btnCheckAppUpdate.addEventListener('click', () => {
     void onCheckAppUpdate();
   });
+  if (el.btnCloseReleaseNotes) {
+    el.btnCloseReleaseNotes.addEventListener('click', closeReleaseNotesModal);
+  }
+  if (el.releaseNotesBackdrop) {
+    el.releaseNotesBackdrop.addEventListener('click', closeReleaseNotesModal);
+  }
+  if (el.btnOpenReleaseNotesPage) {
+    el.btnOpenReleaseNotesPage.addEventListener('click', async () => {
+      if (!state.releaseNotesUrl) {
+        return;
+      }
+
+      try {
+        await window.aeroApi.openExternalUrl(state.releaseNotesUrl);
+      } catch (error) {
+        window.alert(t('alert.openReleasePageFailed', { message: error.message }));
+      }
+    });
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && el.releaseNotesModal && !el.releaseNotesModal.hidden) {
+      closeReleaseNotesModal();
+    }
+  });
   el.btnCheck.addEventListener('click', () => {
     void onCheckUpdates();
   });
@@ -2093,6 +2263,8 @@ function wireEvents() {
 
 async function init() {
   wireEvents();
+  closeReleaseNotesModal();
+  state.releaseNotesUrl = '';
   try {
     await initI18n();
   } catch (error) {

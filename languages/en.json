@@ -19,6 +19,8 @@
     "btn.deleteProfile": "Delete profile",
     "btn.browse": "Browse",
     "btn.checkAppUpdate": "Check app update",
+    "btn.close": "Close",
+    "btn.openReleasePage": "Open release page",
     "btn.checkUpdates": "Check updates",
     "btn.install": "Install",
     "btn.rollback": "Rollback",
@@ -31,6 +33,8 @@
     "btn.clearLog": "Clear log",
     "panel.profileConfig": "Profile configuration",
     "panel.updateConfig": "Update configuration",
+    "panel.releaseNotes": "Release notes",
+    "panel.releaseNotesAvailable": "New version available",
     "panel.optionalPackages": "Optional packages",
     "panel.filePlan": "Planned file actions",
     "panel.log": "Log",
@@ -214,11 +218,11 @@
     "alert.startupFailed": "Startup error:\n{message}",
     "alert.i18nLoadFailed": "Failed to load language file:\n{message}",
     "alert.appUpdateFailed": "App update check failed:\n{message}",
+    "alert.openReleasePageFailed": "Could not open release page:\n{message}",
     "alert.providerUnsupported": "This provider is not natively implemented yet:\n{provider}\n\nPlease use X-Updater for now.",
     "confirm.deleteProfile": "Delete profile?\n{name}",
     "confirm.cancelInstall": "Cancel running installation?",
     "confirm.rollbackInstall": "Rollback the last installation for this profile?\n{name}",
-    "confirm.openReleasePage": "A new app version is available.\nLatest: {latest}\nCurrent: {current}\nOpen release page now?",
     "confirm.newProfileProvider": "Create new profile as iniBuilds profile?\n\nYes = iniBuilds\nNo = X-Updater",
     "field.ignoreList": "Ignore list",
     "placeholder.ignoreList": "one path per line, e.g.\nliveries/\nobjects/custom.obj",
@@ -227,6 +231,9 @@
     "tooltip.appVersion": "Installed app version",
     "log.ignoreApplied": "Ignore list applied: {count} action(s) skipped.",
     "hint.providerHostMismatch": "The update host likely does not match the selected provider. Expected: {expected}.",
-    "hint.inibuildsSelectProduct": "Select an iniBuilds X-Plane product in the dropdown and click \"Check Updates\" again to create an installable plan."
+    "hint.inibuildsSelectProduct": "Select an iniBuilds X-Plane product in the dropdown and click \"Check Updates\" again to create an installable plan.",
+    "releaseNotes.meta": "Latest: {latest} • Current: {current} • Published: {published}",
+    "releaseNotes.unknownDate": "unknown",
+    "releaseNotes.empty": "No release notes text available for this release."
   }
 }

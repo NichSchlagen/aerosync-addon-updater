@@ -268,7 +268,7 @@ function compareVersionTags(left, right) {
 async function checkForAppUpdate() {
   const response = await fetch(APP_UPDATE_API_LATEST_URL, {
     headers: {
-      Accept: 'application/vnd.github+json',
+      Accept: 'application/vnd.github.html+json',
       'User-Agent': 'AeroSync-Addon-Updater'
     }
   });
@@ -300,6 +300,8 @@ async function checkForAppUpdate() {
     latestVersion,
     releaseName: String(release.name || latestVersion).trim(),
     releaseUrl: String(release.html_url || APP_UPDATE_RELEASES_URL).trim(),
+    releaseBodyHtml: String(release.body_html || '').trim(),
+    releaseBody: String(release.body || '').trim(),
     publishedAt: release.published_at || null
   };
 }

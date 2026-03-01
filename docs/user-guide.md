@@ -162,7 +162,7 @@ What it does:
 - reads your installed app version
 - requests the latest release metadata from GitHub
 - compares versions and reports `update available` or `up to date`
-- prompts to open the release page when an update is found
+- when an update is found, opens release notes rendered as Markdown in-app (with option to open full release page)
 
 The checker does not auto-download or auto-install app updates.
 

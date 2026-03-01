@@ -19,6 +19,8 @@
     "btn.deleteProfile": "Profil löschen",
     "btn.browse": "Browse",
     "btn.checkAppUpdate": "App-Update prüfen",
+    "btn.close": "Schließen",
+    "btn.openReleasePage": "Release-Seite öffnen",
     "btn.checkUpdates": "Updates prüfen",
     "btn.install": "Installieren",
     "btn.rollback": "Rollback",
@@ -31,6 +33,8 @@
     "btn.clearLog": "Log leeren",
     "panel.profileConfig": "Profil-Konfiguration",
     "panel.updateConfig": "Update-Konfiguration",
+    "panel.releaseNotes": "Release Notes",
+    "panel.releaseNotesAvailable": "Neue Version verfügbar",
     "panel.optionalPackages": "Optionale Pakete",
     "panel.filePlan": "Geplanter Datei-Plan",
     "panel.log": "Log",
@@ -215,11 +219,11 @@
     "alert.startupFailed": "Startfehler:\n{message}",
     "alert.i18nLoadFailed": "Sprachdatei konnte nicht geladen werden:\n{message}",
     "alert.appUpdateFailed": "App-Update-Prüfung fehlgeschlagen:\n{message}",
+    "alert.openReleasePageFailed": "Release-Seite konnte nicht geöffnet werden:\n{message}",
     "alert.providerUnsupported": "Dieser Provider ist derzeit noch nicht nativ implementiert:\n{provider}\n\nBitte X-Updater verwenden.",
     "confirm.deleteProfile": "Profil wirklich löschen?\n{name}",
     "confirm.cancelInstall": "Laufende Installation wirklich abbrechen?",
     "confirm.rollbackInstall": "Letzte Installation für dieses Profil zurückrollen?\n{name}",
-    "confirm.openReleasePage": "Eine neue App-Version ist verfügbar.\nNeueste: {latest}\nAktuell: {current}\nRelease-Seite jetzt öffnen?",
     "confirm.newProfileProvider": "Neues Profil als iniBuilds-Profil anlegen?\n\nJa = iniBuilds\nNein = X-Updater",
     "field.ignoreList": "Ignore-Liste",
     "placeholder.ignoreList": "ein Pfad pro Zeile, z. B.\nliveries/\nobjects/custom.obj",
@@ -227,6 +231,9 @@
     "tooltip.ignoreList": "Ein Pfadmuster pro Zeile. Zeilen mit # werden ignoriert.",
     "tooltip.appVersion": "Installierte App-Version",
     "log.ignoreApplied": "Ignore-Liste angewendet: {count} Aktion(en) übersprungen.",
-    "hint.providerHostMismatch": "Der Update-Host passt wahrscheinlich nicht zum gewählten Provider. Erwartet: {expected}."
+    "hint.providerHostMismatch": "Der Update-Host passt wahrscheinlich nicht zum gewählten Provider. Erwartet: {expected}.",
+    "releaseNotes.meta": "Neueste: {latest} • Aktuell: {current} • Veröffentlicht: {published}",
+    "releaseNotes.unknownDate": "unbekannt",
+    "releaseNotes.empty": "Für dieses Release sind keine Release Notes verfügbar."
   }
 }
