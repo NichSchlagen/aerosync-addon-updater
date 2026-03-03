@@ -109,6 +109,8 @@ Before processing actions, the app creates a rollback snapshot for the selected 
 - each affected relative path is captured once
 - existing local files are copied to snapshot storage
 - missing files are tracked so rollback can remove them later
+- X-Updater prunes old snapshots automatically (keeps max 5 per profile)
+- iniBuilds stores only the latest snapshot (each install overwrites the previous one)
 
 For each action:
 

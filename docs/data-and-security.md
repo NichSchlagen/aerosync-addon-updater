@@ -113,4 +113,6 @@ Before each installation, the app stores a rollback snapshot in user data:
 - Linux default base: `~/.config/aerosync-addon-updater/install-snapshots/`
 - snapshots are grouped per profile id
 - each snapshot stores a manifest plus backed-up file copies for affected paths
+- X-Updater: maintains up to 5 snapshots per profile (automatic pruning)
+- iniBuilds: maintains only 1 snapshot per profile (overwrites on each install)
 - rollback consumes the latest snapshot for that profile and removes it after successful restore

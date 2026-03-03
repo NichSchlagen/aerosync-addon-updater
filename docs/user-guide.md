@@ -105,8 +105,9 @@ Before every installation, the app creates a rollback snapshot for the selected 
 
 - snapshot includes all files that will be changed or deleted by the install plan
 - `Rollback` restores backed-up files and removes files that were newly created by the failed/undesired install
-- only the latest snapshot per profile is used for rollback
-- after rollback, run `Check Updates` again before starting a new install
+- **X-Updater**: keeps up to 5 snapshots per profile (you can rollback multiple times)
+- **iniBuilds**: keeps only 1 snapshot per profile (each new install overwrites the previous snapshot)
+- after rollback, the used snapshot is removed; run `Check Updates` before starting a new install
 
 ## App Menu And Shortcuts
 
