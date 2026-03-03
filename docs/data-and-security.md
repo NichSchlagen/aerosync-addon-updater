@@ -106,6 +106,13 @@ Diagnostics export format:
 Update plans are kept in memory (`planCache`) and tied to profile id.
 A plan must be installed by the same profile it was created for.
 
+Plan lifetime:
+
+- **X-Updater**: plans expire after 30 minutes (automatic cleanup every 5 minutes)
+- **iniBuilds**: plans remain valid until app restart
+
+If a plan has expired, you will see *"Update plan not found. Run update check first."* when attempting to install.
+
 ## Install Snapshots (Rollback)
 
 Before each installation, the app stores a rollback snapshot in user data:

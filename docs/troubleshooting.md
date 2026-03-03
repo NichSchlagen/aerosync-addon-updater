@@ -120,6 +120,23 @@ Actions:
 
 This mode verifies all known files by hash and repairs missing/corrupted ones.
 
+## Install Fails With "Plan Not Found"
+
+Symptoms:
+
+- clicking `Install` shows error: *"Update plan not found. Run update check first."*
+
+Cause:
+
+- X-Updater plans expire after 30 minutes
+- iniBuilds plans remain valid until app restart
+- switching profiles or app restart also clears the plan cache
+
+Actions:
+
+1. click `Check Updates` to create a fresh plan
+2. click `Install` without waiting 30+ minutes
+
 ## Checksum Mismatch During Install
 
 Symptoms:
