@@ -92,6 +92,11 @@ Available controls:
 - `Cancel`: aborts current run and marks run as cancelled
 - `Rollback`: restores the latest pre-install snapshot for the selected profile
 
+Progress display:
+
+- progress bar shows percentage and file/byte progress
+- meta line additionally shows throughput (`Files/s`, package download rate in `bit/s`) and remaining time (`ETA`)
+
 While check/install is running, profile switching, profile edits, and language switching are blocked.
 
 ## Rollback Snapshot

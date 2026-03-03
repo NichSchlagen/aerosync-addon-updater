@@ -46,6 +46,7 @@ const state = {
   rollbackAvailable: false,
   installPaused: false,
   appUpdateRunning: false,
+  installTelemetry: createInstallTelemetry(),
   releaseNotesUrl: '',
   i18n: {
     locale: 'en',
@@ -332,6 +333,182 @@ function formatDownload(summary) {
   }
 
   return formatBytes(estimatedMax);
+}
+
+function createInstallTelemetry() {
+  return {
+    startedAt: 0,
+    lastTimestamp: 0,
+    lastIndex: 0,
+    lastBytesDownloaded: 0,
+    fileRate: 0,
+    bitRate: 0,
+    etaSeconds: 0,
+    fileSamples: [],
+    byteSamples: []
+  };
+}
+
+function resetInstallTelemetry() {
+  state.installTelemetry = createInstallTelemetry();
+}
+
+function formatRateNumber(value) {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return '0';
+  }
+
+  return new Intl.NumberFormat(state.i18n.localeTag || 'en-US', {
+    minimumFractionDigits: numeric < 10 ? 1 : 0,
+    maximumFractionDigits: numeric < 10 ? 2 : 1
+  }).format(numeric);
+}
+
+function formatBitsPerSecond(bitsPerSecond) {
+  const raw = Number(bitsPerSecond || 0);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return '0 bit/s';
+  }
+
+  const units = ['bit/s', 'Kbit/s', 'Mbit/s', 'Gbit/s', 'Tbit/s'];
+  let value = raw;
+  let unitIndex = 0;
+
+  while (value >= 1000 && unitIndex < units.length - 1) {
+    value /= 1000;
+    unitIndex += 1;
+  }
+
+  return `${formatRateNumber(value)} ${units[unitIndex]}`;
+}
+
+function formatEta(seconds) {
+  const raw = Number(seconds || 0);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return '0:00';
+  }
+
+  const rounded = Math.max(0, Math.ceil(raw));
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const secs = rounded % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  return `${minutes}:${String(secs).padStart(2, '0')}`;
+}
+
+function pushTelemetrySample(samples, timestampMs, value, windowMs, maxSamples = 120) {
+  const safeSamples = Array.isArray(samples) ? samples : [];
+  safeSamples.push({ time: timestampMs, value: Math.max(0, Number(value || 0)) });
+
+  const minTime = timestampMs - Math.max(1000, Number(windowMs || 0));
+  while (safeSamples.length > 2 && safeSamples[0].time < minTime) {
+    safeSamples.shift();
+  }
+  while (safeSamples.length > maxSamples) {
+    safeSamples.shift();
+  }
+
+  return safeSamples;
+}
+
+function calculateWindowRate(samples) {
+  if (!Array.isArray(samples) || samples.length < 2) {
+    return 0;
+  }
+
+  const first = samples[0];
+  const last = samples[samples.length - 1];
+  const deltaValue = Math.max(0, Number(last.value || 0) - Number(first.value || 0));
+  const deltaSec = (Number(last.time || 0) - Number(first.time || 0)) / 1000;
+  if (!Number.isFinite(deltaSec) || deltaSec <= 0) {
+    return 0;
+  }
+
+  return deltaValue / deltaSec;
+}
+
+function buildProgressTelemetry(progress, hasByteProgress) {
+  if (!state.installTelemetry || typeof state.installTelemetry !== 'object') {
+    resetInstallTelemetry();
+  }
+
+  const telemetry = state.installTelemetry;
+  const now = Date.now();
+  if (telemetry.startedAt <= 0) {
+    telemetry.startedAt = now;
+  }
+
+  const total = Math.max(0, Number(progress.total || 0));
+  const index = Math.max(0, Number(progress.index || 0));
+  const bytesDownloaded = Math.max(0, Number(progress.bytesDownloaded || 0));
+  const bytesTotal = Math.max(0, Number(progress.bytesTotal || 0));
+  const elapsedSec = Math.max(0, (now - telemetry.startedAt) / 1000);
+
+  telemetry.fileSamples = pushTelemetrySample(telemetry.fileSamples, now, index, 14000, 140);
+  if (hasByteProgress) {
+    telemetry.byteSamples = pushTelemetrySample(telemetry.byteSamples, now, bytesDownloaded, 9000, 140);
+  } else {
+    telemetry.byteSamples = [];
+  }
+
+  const windowFileRate = calculateWindowRate(telemetry.fileSamples);
+  const windowBitRate = hasByteProgress ? calculateWindowRate(telemetry.byteSamples) * 8 : 0;
+
+  if (windowFileRate > 0 || telemetry.fileRate > 0) {
+    telemetry.fileRate = telemetry.fileRate > 0
+      ? (telemetry.fileRate * 0.82) + (windowFileRate * 0.18)
+      : windowFileRate;
+  }
+
+  if (hasByteProgress) {
+    if (windowBitRate > 0 || telemetry.bitRate > 0) {
+      telemetry.bitRate = telemetry.bitRate > 0
+        ? (telemetry.bitRate * 0.84) + (windowBitRate * 0.16)
+        : windowBitRate;
+    }
+  } else {
+    telemetry.bitRate = 0;
+  }
+
+  if (telemetry.fileRate <= 0 && elapsedSec > 1 && index > 0) {
+    telemetry.fileRate = index / elapsedSec;
+  }
+
+  if (hasByteProgress && telemetry.bitRate <= 0 && elapsedSec > 1 && bytesDownloaded > 0) {
+    telemetry.bitRate = (bytesDownloaded * 8) / elapsedSec;
+  }
+
+  const ratio = hasByteProgress && bytesTotal > 0
+    ? Math.min(1, bytesDownloaded / bytesTotal)
+    : total > 0
+      ? Math.min(1, index / total)
+      : 0;
+  const rawEtaSeconds = ratio > 0 && ratio < 1
+    ? Math.max(0, (elapsedSec / ratio) - elapsedSec)
+    : null;
+
+  if (rawEtaSeconds !== null) {
+    telemetry.etaSeconds = telemetry.etaSeconds > 0
+      ? (telemetry.etaSeconds * 0.85) + (rawEtaSeconds * 0.15)
+      : rawEtaSeconds;
+  } else if (ratio >= 1) {
+    telemetry.etaSeconds = 0;
+  }
+
+  telemetry.lastTimestamp = now;
+  telemetry.lastIndex = index;
+  telemetry.lastBytesDownloaded = bytesDownloaded;
+
+  return {
+    filesPerSecond: telemetry.fileRate > 0 ? formatRateNumber(telemetry.fileRate) : '',
+    bitsPerSecond: hasByteProgress && telemetry.bitRate > 0 ? formatBitsPerSecond(telemetry.bitRate) : '',
+    eta: telemetry.etaSeconds > 0 ? formatEta(telemetry.etaSeconds) : ''
+  };
 }
 
 function parseIgnoreListInput(input) {
@@ -632,6 +809,7 @@ function setAppVersion(version) {
 }
 
 function resetProgressUi() {
+  resetInstallTelemetry();
   el.progressLabel.textContent = t('progress.ready');
   el.progressPercent.textContent = '0%';
   el.progressMeta.textContent = t('progress.meta', { index: 0, total: 0 });
@@ -651,12 +829,26 @@ function updateProgressUi(progress) {
       ? Math.max(0, Math.min(100, Math.round((index / total) * 100)))
       : 0;
   const message = String(progress.message || '').trim();
+  const telemetry = buildProgressTelemetry(progress, hasByteProgress);
 
   el.progressFill.style.width = `${percent}%`;
   el.progressPercent.textContent = `${percent}%`;
-  el.progressMeta.textContent = hasByteProgress
+  const baseMeta = hasByteProgress
     ? t('progress.metaBytes', { downloaded: formatBytes(bytesDownloaded), total: formatBytes(bytesTotal) })
     : t('progress.meta', { index, total });
+  const metaParts = [];
+  if (telemetry.filesPerSecond) {
+    metaParts.push(t('progress.filesPerSecond', { value: telemetry.filesPerSecond }));
+  }
+  if (telemetry.bitsPerSecond) {
+    metaParts.push(t('progress.bitsPerSecond', { value: telemetry.bitsPerSecond }));
+  }
+  if (telemetry.eta) {
+    metaParts.push(t('progress.eta', { value: telemetry.eta }));
+  }
+  el.progressMeta.textContent = metaParts.length > 0
+    ? `${baseMeta} • ${metaParts.join(' • ')}`
+    : baseMeta;
   if (/^DOWNLOAD\b/i.test(message)) {
     el.progressLabel.textContent = t('progress.downloadingPackage');
   } else if (/^VERIFY\b/i.test(message)) {
@@ -1548,6 +1740,7 @@ async function onInstallUpdates() {
   }
 
   try {
+    resetInstallTelemetry();
     state.installRunning = true;
     state.installPaused = false;
     syncActionButtons();

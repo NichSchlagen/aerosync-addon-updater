@@ -490,8 +490,14 @@ textarea:focus {
 
 .progress-meta {
   margin-top: 7px;
+  font-family: var(--mono-font);
   font-size: 0.76rem;
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .progress-file {
@@ -746,6 +752,14 @@ td.empty {
   font-size: 0.74rem;
   color: var(--text-light);
   background: rgba(255, 255, 255, 0.05);
+}
+
+#progressPercent {
+  min-width: 5.2ch;
+  text-align: right;
+  font-family: var(--mono-font);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .btn {
