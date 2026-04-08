@@ -1,6 +1,6 @@
 {
   "name": "aerosync-addon-updater",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Desktop updater for X-Plane add-ons with support for X-Updater and iniBuilds",
   "main": "main.js",
   "private": true,
