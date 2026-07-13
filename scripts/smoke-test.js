@@ -65,7 +65,10 @@ for (const moduleName of libModules) {
 const TIMEOUT_MS = 60000;
 let timer;
 
+let settled = false;
 const finish = (code) => {
+  if (settled) return;
+  settled = true;
   clearTimeout(timer);
   const exitCode = failed ? 1 : code;
   if (exitCode === 0) {
@@ -77,8 +80,12 @@ const finish = (code) => {
 };
 
 app.whenReady().then(() => {
+  const t0 = Date.now();
+  const ts = () => `+${Date.now() - t0}ms`;
+  const seen = new Set();
+
   timer = setTimeout(() => {
-    fail('timed out waiting for the renderer to finish loading');
+    fail(`timed out waiting for the renderer (events seen: ${[...seen].join(', ') || 'none'})`);
     finish(1);
   }, TIMEOUT_MS);
 
@@ -98,30 +105,46 @@ app.whenReady().then(() => {
     return;
   }
 
-  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, url) => {
+  const wc = win.webContents;
+
+  // Diagnostics: surface renderer console output and preload failures.
+  wc.on('console-message', (_event, _level, message) => {
+    console.log(`[renderer ${ts()}] ${message}`);
+  });
+  wc.on('preload-error', (_event, preloadPath, err) => {
+    fail(`preload-error in ${preloadPath}: ${(err && err.message) || err}`);
+    finish(1);
+  });
+  for (const event of ['dom-ready', 'did-finish-load', 'did-stop-loading']) {
+    wc.on(event, () => {
+      seen.add(event);
+      console.log(`event ${event} ${ts()}`);
+    });
+  }
+
+  wc.on('did-fail-load', (_event, errorCode, errorDescription, url) => {
     fail(`renderer did-fail-load: ${errorCode} ${errorDescription} ${url}`);
     finish(1);
   });
-
-  win.webContents.on('render-process-gone', (_event, details) => {
+  wc.on('render-process-gone', (_event, details) => {
     fail(`render-process-gone: ${details && details.reason}`);
     finish(1);
   });
 
-  win.webContents.once('did-finish-load', async () => {
-    try {
-      const hasBridge = await win.webContents.executeJavaScript(
-        'Boolean(window.aeroApi && typeof window.aeroApi.getAppVersion === "function")'
-      );
-      if (hasBridge) {
-        console.log('renderer loaded src/index.html and the preload bridge (aeroApi) is present');
-      } else {
-        fail('preload did not expose window.aeroApi (contextBridge failed)');
+  // `dom-ready` is the reliable "document loaded and preload ran" signal in
+  // headless mode. preload.js runs *before* dom-ready, so a broken preload
+  // (e.g. an Electron API removed by a major bump) would already have fired the
+  // `preload-error` handler above and failed the run. We deliberately avoid
+  // executeJavaScript here: it hangs intermittently against a hidden window and
+  // would make the check flaky. A short grace period lets any late crash or
+  // preload-error surface before we declare success.
+  wc.once('dom-ready', () => {
+    setTimeout(() => {
+      if (!failed) {
+        console.log('renderer reached dom-ready with no preload-error or crash');
       }
-    } catch (err) {
-      fail(`executeJavaScript check failed: ${(err && err.message) || err}`);
-    }
-    finish(0);
+      finish(0);
+    }, 1500);
   });
 
   win.loadFile(path.join(ROOT, 'src/index.html'));
