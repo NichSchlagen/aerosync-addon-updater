@@ -15,6 +15,8 @@
   "scripts": {
     "start": "electron .",
     "start:linux": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "smoke": "electron --no-sandbox scripts/smoke-test.js",
+    "smoke:linux": "env -u ELECTRON_RUN_AS_NODE electron --no-sandbox scripts/smoke-test.js",
     "pack": "electron-builder --dir",
     "build:appimage": "electron-builder --linux AppImage",
     "build:win": "npm run build:win:setup && npm run build:win:portable",
