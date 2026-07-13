@@ -21,10 +21,11 @@ const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = requir
 // Robustness switches for this throwaway smoke run in headless / sandboxed
 // environments only (CI runners, containers). main.js and the packaged app are
 // unaffected.
-//   no-sandbox           - the bundled chrome-sandbox is not setuid in node_modules
 //   disable-dev-shm-usage - avoid FATAL crashes where /dev/shm is tiny/locked down
-//   disable-gpu          - no GPU in headless CI; also dodges Wayland/Vulkan noise
-app.commandLine.appendSwitch('no-sandbox');
+//   disable-gpu           - no GPU in headless CI; also dodges Wayland/Vulkan noise
+// The sandbox itself is disabled via a real `--no-sandbox` CLI arg (see the
+// `smoke` npm scripts): the browser process reads that from argv before this JS
+// runs, so appendSwitch('no-sandbox') here would be too late.
 app.commandLine.appendSwitch('disable-dev-shm-usage');
 app.commandLine.appendSwitch('disable-gpu');
 
